@@ -16,7 +16,7 @@ class Config:
     JWT_COOKIE_CSRF_PROTECT = False
 
     _db_url = os.getenv("DATABASE_URL", "")
-    if not _db_url or os.getenv("USE_SQLITE", "").lower() in ("1", "true", "yes"):
+    if not _db_url:
         _root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         _db_url = "sqlite:///" + os.path.join(_root, "database", "skillswap.db").replace("\\", "/")
     SQLALCHEMY_DATABASE_URI = _db_url

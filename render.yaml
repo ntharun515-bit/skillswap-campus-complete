@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: skillswap-campus
+    env: docker
+    plan: free
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: DATABASE_URL
+        value: sqlite:////app/persistent_data/skillswap.db
+      - key: UPLOAD_FOLDER
+        value: /app/persistent_data/uploads
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: CORS_ORIGINS
+        value: "*"
+    disk:
+      name: skillswap-storage
+      mountPath: /app/persistent_data
+      sizeGB: 1

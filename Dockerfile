@@ -25,8 +25,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 6. Copy App Codebase
 COPY . .
 
+# Make entrypoint script executable
+RUN chmod +x entrypoint.sh
+
 # 7. Expose Container Port (Cloud Run binds dynamically via $PORT)
 EXPOSE 8080
 
-# 8. Start Gunicorn with high-performance Eventlet worker wrapper for real-time WebSockets!
-CMD exec gunicorn --worker-class eventlet --workers 1 --bind 0.0.0.0:$PORT run:app
+# 8. Run entrypoint script which handles auto-seeding and boots Gunicorn
+CMD ["/app/entrypoint.sh"]
