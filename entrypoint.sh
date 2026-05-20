@@ -1,12 +1,11 @@
 #!/bin/sh
 
-# Ensure persistent directories exist inside the mounted volume
-mkdir -p /app/persistent_data/uploads
-mkdir -p /app/persistent_data/logs
+# Ensure directories exist
+mkdir -p /app/database
+mkdir -p /app/uploads
+mkdir -p /app/logs
 
-# Extract the database file path from DATABASE_URL if it's an SQLite URI
-# e.g., sqlite:////app/persistent_data/skillswap.db -> /app/persistent_data/skillswap.db
-DB_FILE="/app/persistent_data/skillswap.db"
+DB_FILE="/app/database/skillswap.db"
 
 # Check if SQLite database exists. If not, seed it!
 if [ ! -f "$DB_FILE" ]; then
