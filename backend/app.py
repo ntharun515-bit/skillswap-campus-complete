@@ -61,11 +61,14 @@ def create_app(config_name=None):
     def index():
         return send_from_directory(app.static_folder, "pages/public/index.html")
 
+    @app.route("/<string:page>")
     @app.route("/<string:page>.html")
     def serve_public_page(page):
         public_pages = {"index", "about", "contact", "faq", "freelancers", "login", "profile", "projects", "register"}
         if page in public_pages:
             return send_from_directory(app.static_folder, f"pages/public/{page}.html")
+        if "." in page or page.startswith("api"):
+            return jsonify({"error": "Resource Not Found", "message": f"The requested URL /{page} was not found on the server."}), 404
         return send_from_directory(app.static_folder, "pages/public/index.html")
 
     @app.route("/profile/<string:slug>")

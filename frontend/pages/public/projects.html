@@ -111,7 +111,7 @@
         const deadline = p.deadline ? new Date(p.deadline).toLocaleDateString() : 'Flexible';
         const appsCount = p.application_count || 0;
         const actionBtn = !user
-          ? `<a href="login.html" class="btn btn-primary btn-sm">Sign In to Apply</a>`
+          ? `<a href="/login" class="btn btn-primary btn-sm">Sign In to Apply</a>`
           : p.status === 'open'
             ? `<a href="/frontend/pages/student/projects.html" class="btn btn-primary btn-sm">View & Apply</a>`
             : `<span style="font-size:.82rem;color:var(--text-secondary)">Closed</span>`;

@@ -4,19 +4,19 @@ function renderNavbar(active = "") {
   return `
     <nav class="navbar">
       <div class="container">
-        <a href="/frontend/pages/public/index.html" class="logo">SkillSwap</a>
+        <a href="/" class="logo">SkillSwap</a>
         <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰</button>
         <ul class="nav-links">
-          <li><a href="/frontend/pages/public/index.html" class="${active === "home" ? "active" : ""}">Home</a></li>
-          <li><a href="/frontend/pages/public/projects.html" class="${active === "projects" ? "active" : ""}">Projects</a></li>
-          <li><a href="/frontend/pages/public/freelancers.html" class="${active === "freelancers" ? "active" : ""}">Freelancers</a></li>
-          <li><a href="/frontend/pages/public/about.html">About</a></li>
-          <li><a href="/frontend/pages/public/faq.html">FAQ</a></li>
+          <li><a href="/" class="${active === "home" ? "active" : ""}">Home</a></li>
+          <li><a href="/projects" class="${active === "projects" ? "active" : ""}">Projects</a></li>
+          <li><a href="/freelancers" class="${active === "freelancers" ? "active" : ""}">Freelancers</a></li>
+          <li><a href="/about">About</a></li>
+          <li><a href="/faq">FAQ</a></li>
           ${user
             ? `<li><a href="#" onclick="redirectByRole('${user.role}');return false;">Dashboard</a></li>
                <li><button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button></li>`
-            : `<li><a href="/frontend/pages/public/login.html">Login</a></li>
-               <li><a href="/frontend/pages/public/register.html" class="btn btn-primary btn-sm">Sign Up</a></li>`}
+            : `<li><a href="/login">Login</a></li>
+               <li><a href="/register" class="btn btn-primary btn-sm">Sign Up</a></li>`}
           <li><button class="theme-toggle btn-ghost btn-sm" onclick="toggleTheme()">🌙</button></li>
         </ul>
       </div>
@@ -35,18 +35,18 @@ function renderFooter() {
           <div>
             <h4 style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:1rem;color:var(--text-secondary)">Platform</h4>
             <ul style="list-style:none;padding:0;display:flex;flex-direction:column;gap:0.5rem;font-size:0.88rem">
-              <li><a href="/frontend/pages/public/projects.html" style="color:var(--text-secondary);text-decoration:none">Browse Projects</a></li>
-              <li><a href="/frontend/pages/public/freelancers.html" style="color:var(--text-secondary);text-decoration:none">Find Freelancers</a></li>
-              <li><a href="/frontend/pages/public/register.html" style="color:var(--text-secondary);text-decoration:none">Create Account</a></li>
-              <li><a href="/frontend/pages/public/login.html" style="color:var(--text-secondary);text-decoration:none">Sign In</a></li>
+              <li><a href="/projects" style="color:var(--text-secondary);text-decoration:none">Browse Projects</a></li>
+              <li><a href="/freelancers" style="color:var(--text-secondary);text-decoration:none">Find Freelancers</a></li>
+              <li><a href="/register" style="color:var(--text-secondary);text-decoration:none">Create Account</a></li>
+              <li><a href="/login" style="color:var(--text-secondary);text-decoration:none">Sign In</a></li>
             </ul>
           </div>
           <div>
             <h4 style="font-size:0.85rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:1rem;color:var(--text-secondary)">Resources</h4>
             <ul style="list-style:none;padding:0;display:flex;flex-direction:column;gap:0.5rem;font-size:0.88rem">
-              <li><a href="/frontend/pages/public/about.html" style="color:var(--text-secondary);text-decoration:none">About Us</a></li>
-              <li><a href="/frontend/pages/public/faq.html" style="color:var(--text-secondary);text-decoration:none">FAQ & Help</a></li>
-              <li><a href="/frontend/pages/public/contact.html" style="color:var(--text-secondary);text-decoration:none">Contact Support</a></li>
+              <li><a href="/about" style="color:var(--text-secondary);text-decoration:none">About Us</a></li>
+              <li><a href="/faq" style="color:var(--text-secondary);text-decoration:none">FAQ & Help</a></li>
+              <li><a href="/contact" style="color:var(--text-secondary);text-decoration:none">Contact Support</a></li>
             </ul>
           </div>
           <div>
@@ -62,9 +62,9 @@ function renderFooter() {
         <div style="border-top:1px solid var(--border);padding-top:1.5rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem">
           <p style="font-size:0.82rem;color:var(--text-secondary)">&copy; ${new Date().getFullYear()} SkillSwap. Built for students, by students.</p>
           <div style="display:flex;gap:1.25rem;font-size:0.82rem">
-            <a href="/frontend/pages/public/faq.html" style="color:var(--text-secondary);text-decoration:none">Help</a>
-            <a href="/frontend/pages/public/contact.html" style="color:var(--text-secondary);text-decoration:none">Support</a>
-            <a href="/frontend/pages/public/about.html" style="color:var(--text-secondary);text-decoration:none">About</a>
+            <a href="/faq" style="color:var(--text-secondary);text-decoration:none">Help</a>
+            <a href="/contact" style="color:var(--text-secondary);text-decoration:none">Support</a>
+            <a href="/about" style="color:var(--text-secondary);text-decoration:none">About</a>
           </div>
         </div>
       </div>
