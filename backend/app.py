@@ -61,6 +61,13 @@ def create_app(config_name=None):
     def index():
         return send_from_directory(app.static_folder, "pages/public/index.html")
 
+    @app.route("/<string:page>.html")
+    def serve_public_page(page):
+        public_pages = {"index", "about", "contact", "faq", "freelancers", "login", "profile", "projects", "register"}
+        if page in public_pages:
+            return send_from_directory(app.static_folder, f"pages/public/{page}.html")
+        return send_from_directory(app.static_folder, "pages/public/index.html")
+
     @app.route("/profile/<string:slug>")
     def public_profile_page(slug):
         return send_from_directory(app.static_folder, "pages/public/profile.html")
