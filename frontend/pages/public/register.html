@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Account | SkillSwap</title>
+  <meta name="description" content="Join SkillSwap — the student-only freelance marketplace. Register as a freelancer or client in seconds.">
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <style>
+    .auth-split{display:grid;grid-template-columns:1fr 1fr;min-height:calc(100vh - var(--navbar-height));overflow:hidden}
+    @media(max-width:900px){.auth-split{grid-template-columns:1fr}.auth-side{display:none}}
+    .auth-side{background:var(--gradient-hero);padding:4rem 3rem;display:flex;flex-direction:column;justify-content:center;color:#fff}
+    .auth-side h2{font-size:2rem;font-weight:900;margin-bottom:1rem;line-height:1.15;font-family:var(--font-heading)}
+    .auth-side p{font-size:1rem;opacity:.85;line-height:1.6;margin-bottom:2rem}
+    .benefit-item{display:flex;gap:.65rem;align-items:center;margin-bottom:1.1rem;font-size:.92rem}
+    .benefit-item .bi-check{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:.75rem;flex-shrink:0}
+    .auth-form-panel{display:flex;align-items:center;justify-content:center;padding:3rem 2rem}
+    .auth-form-panel form{width:100%;max-width:440px}
+    .role-selector{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.25rem}
+    .role-option{padding:1rem;border:2px solid var(--border);border-radius:var(--radius-md);text-align:center;cursor:pointer;transition:border-color .2s,background .2s;background:var(--bg-glass)}
+    .role-option:hover{border-color:var(--accent)}
+    .role-option.selected{border-color:var(--accent);background:var(--accent-glow)}
+    .role-option .ro-icon{font-size:1.5rem;display:block;margin-bottom:.35rem}
+    .role-option .ro-title{font-weight:700;font-size:.9rem;display:block}
+    .role-option .ro-desc{font-size:.75rem;color:var(--text-secondary);display:block;margin-top:.15rem}
+  </style>
+</head>
+<body>
+  <div id="nav"></div>
+  <main id="main">
+    <div class="auth-split">
+      <!-- Left: Benefits Panel -->
+      <div class="auth-side">
+        <h2>Start Building Your<br>Campus Career Today</h2>
+        <p>Join a thriving network of students turning their academic skills into real projects, earnings, and professional experience.</p>
+        <div class="benefit-item"><div class="bi-check">✓</div>100% free — zero platform fees forever</div>
+        <div class="benefit-item"><div class="bi-check">✓</div>Smart escrow protects every transaction</div>
+        <div class="benefit-item"><div class="bi-check">✓</div>AI-powered project matching engine</div>
+        <div class="benefit-item"><div class="bi-check">✓</div>Collaborative workspaces with Kanban & chat</div>
+        <div class="benefit-item"><div class="bi-check">✓</div>Gamified XP, badges, and campus leaderboards</div>
+        <div class="benefit-item"><div class="bi-check">✓</div>Skill verification quizzes for trust badges</div>
+        <div class="benefit-item"><div class="bi-check">✓</div>AI resume builder and career tools</div>
+        <div class="benefit-item"><div class="bi-check">✓</div>Admin dispute mediation for safety</div>
+      </div>
+
+      <!-- Right: Register Form -->
+      <div class="auth-form-panel">
+        <form id="rf">
+          <h1 style="font-size:1.85rem;font-weight:800;letter-spacing:-.03em;margin-bottom:.25rem">Create Your Account</h1>
+          <p style="color:var(--text-secondary);font-size:.9rem;margin-bottom:1.75rem">Join the next-gen student talent marketplace</p>
+
+          <div class="form-group">
+            <label style="font-weight:600;font-size:.85rem">Full Name</label>
+            <input type="text" id="name" placeholder="Your full name" required style="width:100%" class="form-control">
+          </div>
+          <div class="form-group">
+            <label style="font-weight:600;font-size:.85rem">University Email</label>
+            <input type="email" id="email" placeholder="you@university.edu" required style="width:100%" class="form-control">
+          </div>
+          <div class="form-group">
+            <label style="font-weight:600;font-size:.85rem">Campus / University</label>
+            <input type="text" id="campus" placeholder="e.g. MIT, Stanford, IIT..." required style="width:100%" class="form-control">
+          </div>
+
+          <label style="font-weight:600;font-size:.85rem;display:block;margin-bottom:.5rem">I want to...</label>
+          <input type="hidden" id="role" value="student">
+          <div class="role-selector">
+            <div class="role-option selected" onclick="selectRole('student',this)">
+              <span class="ro-icon">🎓</span>
+              <span class="ro-title">Freelance</span>
+              <span class="ro-desc">Offer skills & earn credits</span>
+            </div>
+            <div class="role-option" onclick="selectRole('client',this)">
+              <span class="ro-icon">💼</span>
+              <span class="ro-title">Hire Talent</span>
+              <span class="ro-desc">Post projects & hire students</span>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom:1.75rem">
+            <label style="font-weight:600;font-size:.85rem">Create Password</label>
+            <input type="password" id="password" placeholder="Minimum 8 characters" minlength="8" required style="width:100%" class="form-control">
+          </div>
+          <button class="btn btn-primary btn-lg" style="width:100%" type="submit">Create Account</button>
+          <p style="margin-top:1.5rem;text-align:center;font-size:.9rem;color:var(--text-secondary)">
+            Already have an account? <a href="login.html" style="font-weight:700;color:var(--accent)">Sign In</a>
+          </p>
+        </form>
+      </div>
+    </div>
+  </main>
+  <div id="footer"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script>
+    document.getElementById('nav').innerHTML = renderNavbar('register');
+    document.getElementById('footer').innerHTML = renderFooter();
+
+    function selectRole(role, el) {
+      document.getElementById('role').value = role;
+      document.querySelectorAll('.role-option').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    document.getElementById('rf').onsubmit = async e => {
+      e.preventDefault();
+      try {
+        const d = await API.post('/auth/register', {
+          full_name: document.getElementById('name').value,
+          email: document.getElementById('email').value,
+          campus: document.getElementById('campus').value,
+          role: document.getElementById('role').value,
+          password: document.getElementById('password').value
+        });
+        saveSession(d);
+        showToast('Account created successfully! Welcome aboard 🎉', 'success');
+        redirectByRole(d.user.role);
+      } catch (err) {
+        showToast(err.message || 'Registration failed', 'error');
+      }
+    };
+  </script>
+</body>
+</html>

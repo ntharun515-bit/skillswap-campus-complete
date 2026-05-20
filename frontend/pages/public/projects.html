@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browse Projects | SkillSwap</title>
+  <meta name="description" content="Browse open campus projects on SkillSwap. Apply to freelance gigs in coding, design, writing, and tutoring.">
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <style>
+    .pj-hero{padding:4rem 0 2rem;text-align:center}
+    .pj-hero h1{font-size:clamp(1.8rem,4vw,2.6rem);font-weight:900;font-family:var(--font-heading);margin-bottom:.5rem}
+    .pj-hero p{font-size:1.05rem;color:var(--text-secondary);max-width:550px;margin:0 auto 1.5rem}
+    .pj-filters{display:flex;gap:.75rem;max-width:650px;margin:0 auto;flex-wrap:wrap}
+    .pj-filters input,.pj-filters select{flex:1;min-width:140px;padding:.75rem 1rem;border-radius:var(--radius-lg);border:1px solid var(--border);background:var(--bg-glass);color:var(--text-primary);font-size:.95rem;backdrop-filter:blur(var(--blur))}
+    .pj-count{text-align:center;font-size:.88rem;color:var(--text-secondary);margin:1.5rem 0 .5rem;font-weight:600}
+    .pj-card{padding:1.75rem;display:flex;flex-direction:column;gap:.6rem;transition:transform .25s,border-color .25s}
+    .pj-card:hover{transform:translateY(-4px);border-color:var(--accent)}
+    .pj-card h3{font-size:1.1rem;font-weight:700;margin:0}
+    .pj-desc{font-size:.88rem;color:var(--text-secondary);line-height:1.55;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+    .pj-meta{display:flex;gap:1.25rem;font-size:.82rem;color:var(--text-secondary);flex-wrap:wrap}
+    .pj-meta strong{color:var(--text-primary)}
+    .pj-skills{display:flex;gap:.4rem;flex-wrap:wrap}
+    .pj-skill{padding:.2rem .55rem;border-radius:999px;font-size:.72rem;font-weight:600;background:rgba(13,148,136,.08);color:var(--accent);border:1px solid rgba(13,148,136,.15)}
+    .pj-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:.75rem;border-top:1px solid var(--border)}
+    .pj-budget{font-weight:800;color:var(--success);font-size:1.1rem}
+    .pj-status{padding:.2rem .7rem;border-radius:999px;font-size:.75rem;font-weight:700}
+    .pj-open{background:rgba(16,185,129,.12);color:var(--success)}
+    .pj-progress{background:rgba(245,158,11,.12);color:var(--warning)}
+  </style>
+</head>
+<body>
+  <div id="nav"></div>
+  <main id="main">
+    <section class="pj-hero container">
+      <h1>Browse Campus Projects</h1>
+      <p>Find open freelance projects posted by students and faculty. Apply with your proposal and start earning campus credits.</p>
+      <div class="pj-filters">
+        <input type="text" id="pj-q" placeholder="🔍  Search by title or skill..." oninput="searchProjects()">
+        <select id="pj-sort" onchange="searchProjects()">
+          <option value="newest">🆕 Newest First</option>
+          <option value="budget-high">💎 Highest Budget</option>
+          <option value="budget-low">💰 Lowest Budget</option>
+        </select>
+        <select id="pj-status" onchange="searchProjects()">
+          <option value="open">📢 Open Only</option>
+          <option value="all">📋 All Projects</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="section container" style="padding:0 0 5rem">
+      <div class="pj-count" id="pj-count">Loading projects...</div>
+      <div class="grid grid-2" id="pj-list" style="gap:1.25rem"></div>
+    </section>
+  </main>
+  <div id="footer"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script>
+    document.getElementById('nav').innerHTML = renderNavbar('projects');
+    document.getElementById('footer').innerHTML = renderFooter();
+
+    let allProjects = [];
+    const user = getUser();
+
+    async function loadProjects() {
+      try {
+        allProjects = await fetch(CONFIG.API_BASE + '/projects').then(r => r.json());
+        searchProjects();
+      } catch(e) {
+        document.getElementById('pj-list').innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text-secondary);padding:3rem">Unable to load projects. Ensure the backend server is running.</p>';
+        document.getElementById('pj-count').textContent = '';
+      }
+    }
+
+    function searchProjects() {
+      const q = document.getElementById('pj-q').value.toLowerCase().trim();
+      const sort = document.getElementById('pj-sort').value;
+      const statusFilter = document.getElementById('pj-status').value;
+
+      let filtered = allProjects.filter(p => {
+        const matchQ = !q || p.title.toLowerCase().includes(q) || (p.description||'').toLowerCase().includes(q) || (p.skills_required||'').toLowerCase().includes(q);
+        const matchStatus = statusFilter === 'all' || p.status === statusFilter;
+        return matchQ && matchStatus;
+      });
+
+      if (sort === 'newest') filtered.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+      else if (sort === 'budget-high') filtered.sort((a,b) => (b.budget||0) - (a.budget||0));
+      else if (sort === 'budget-low') filtered.sort((a,b) => (a.budget||0) - (b.budget||0));
+
+      renderProjects(filtered);
+    }
+
+    function renderProjects(list) {
+      const container = document.getElementById('pj-list');
+      document.getElementById('pj-count').textContent = `${list.length} project${list.length !== 1 ? 's' : ''} found`;
+      if (!list.length) {
+        container.innerHTML = '<div class="glass card" style="grid-column:1/-1;text-align:center;padding:3rem"><p style="color:var(--text-secondary)">No projects match your filters. Try changing your search.</p></div>';
+        return;
+      }
+      container.innerHTML = list.map(p => {
+        const skills = (p.skills_required || '').split(',').filter(s => s.trim());
+        const statusClass = p.status === 'open' ? 'pj-open' : 'pj-progress';
+        const statusLabel = p.status === 'open' ? '📢 Open' : p.status === 'in_progress' ? '🔒 In Progress' : p.status === 'completed' ? '✅ Completed' : p.status;
+        const deadline = p.deadline ? new Date(p.deadline).toLocaleDateString() : 'Flexible';
+        const appsCount = p.application_count || 0;
+        const actionBtn = !user
+          ? `<a href="login.html" class="btn btn-primary btn-sm">Sign In to Apply</a>`
+          : p.status === 'open'
+            ? `<a href="/frontend/pages/student/projects.html" class="btn btn-primary btn-sm">View & Apply</a>`
+            : `<span style="font-size:.82rem;color:var(--text-secondary)">Closed</span>`;
+
+        return `
+          <article class="glass card pj-card">
+            <div style="display:flex;justify-content:space-between;align-items:start">
+              <h3>${p.title}</h3>
+              <span class="pj-status ${statusClass}">${statusLabel}</span>
+            </div>
+            <p class="pj-desc">${p.description || 'No description provided.'}</p>
+            <div class="pj-meta">
+              <span>📅 <strong>${deadline}</strong></span>
+              <span>👤 <strong>${appsCount}</strong> applicant${appsCount !== 1 ? 's' : ''}</span>
+              <span>👤 ${p.client_name || 'Client'}</span>
+            </div>
+            ${skills.length ? `<div class="pj-skills">${skills.map(s => `<span class="pj-skill">${s.trim()}</span>`).join('')}</div>` : ''}
+            <div class="pj-bottom">
+              <span class="pj-budget">${formatMoney(p.budget)}</span>
+              ${actionBtn}
+            </div>
+          </article>`;
+      }).join('');
+    }
+
+    loadProjects();
+  </script>
+</body>
+</html>

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verification Desk | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <style>
+    .verification-card {
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      border-radius: var(--radius-lg);
+      background: var(--bg-glass);
+      border: 1px solid var(--border);
+      transition: transform var(--transition), border-color var(--transition);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-left: 4px solid var(--accent);
+    }
+    .verification-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(13, 148, 136, 0.25);
+    }
+    .v-icon-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      background: rgba(13, 148, 136, 0.1);
+      border: 1px solid rgba(13, 148, 136, 0.15);
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('admin', 'verification', 'Skill Verifications', function(el) {
+      el.innerHTML = `
+        <div class="stats-grid" id="v-stats" style="margin-bottom:2rem">
+          <div class="glass card skeleton" style="height:100px"></div>
+          <div class="glass card skeleton" style="height:100px"></div>
+          <div class="glass card skeleton" style="height:100px"></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 300px;gap:2rem">
+          <div>
+            <article class="glass card" style="min-height:400px">
+              <h3 style="font-size:1.25rem;margin-bottom:0.25rem">🏅 Pending Verification Applications</h3>
+              <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.5rem">Audit submitted credentials, inspect resumes/documents, and approve Verified Pro badges.</p>
+              
+              <div id="vr" class="grid grid-2">
+                <div class="glass card skeleton" style="height:120px"></div>
+              </div>
+            </article>
+          </div>
+
+          <div>
+            <div style="display:flex;flex-direction:column;gap:1.5rem;position:sticky;top:1rem">
+              <!-- Verification Guidelines -->
+              <article class="glass card" style="padding:1.5rem">
+                <h4 style="font-size:1.1rem;margin-bottom:0.5rem">🛡️ Verification Protocol</h4>
+                <p style="color:var(--text-secondary);font-size:0.8rem;line-height:1.45;margin:0">
+                  1. Check if the student's uploaded document represents a valid coding, UX design, or essay writing certificate.<br><br>
+                  2. Approve to grant them the gold **Verified Pro** shield and rank them at the top of client matching searches!
+                </p>
+              </article>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const statsEl = document.getElementById('v-stats');
+      const listEl = document.getElementById('vr');
+
+      async function loadVerificationsWorkspace() {
+        try {
+          statsEl.innerHTML = `
+            <div class="glass card skeleton" style="height:100px"></div>
+            <div class="glass card skeleton" style="height:100px"></div>
+            <div class="glass card skeleton" style="height:100px"></div>
+          `;
+
+          const [reqs, users] = await Promise.all([
+            API.get('/admin/verifications'),
+            API.get('/admin/users')
+          ]);
+
+          // Calculate counts
+          const totalPending = reqs.length;
+          const verifiedPros = users.filter(u => u.freelancer_profile?.is_verified).length;
+          const totalStudents = users.filter(u => u.role === 'student').length;
+
+          statsEl.innerHTML = `
+            <article class="glass stat-card">
+              <span class="label">🏅 Pending Requests</span>
+              <span class="value" style="color:var(--accent)">${totalPending} Applications</span>
+            </article>
+            <article class="glass stat-card">
+              <span class="label">🛡️ Verified Pros</span>
+              <span class="value" style="color:var(--success)">${verifiedPros} Students</span>
+            </article>
+            <article class="glass stat-card">
+              <span class="label">👥 Total Campus Students</span>
+              <span class="value">${totalStudents} Members</span>
+            </article>
+          `;
+
+          if (reqs.length === 0) {
+            listEl.innerHTML = `
+              <div style="grid-column:1/-1;text-align:center;padding:5rem 2rem;color:var(--text-secondary)">
+                <span style="font-size:3.5rem">🏅</span>
+                <h3 style="margin-top:1.5rem">Desk All Clear!</h3>
+                <p style="color:var(--text-secondary);margin-top:0.5rem">No pending student verification requests found in queue.</p>
+              </div>
+            `;
+            return;
+          }
+
+          listEl.innerHTML = reqs.map(x => {
+            const studentName = x.user_name || `User #${x.user_id}`;
+            const skillName = x.skill_name || 'General Campus Skills';
+            const docLink = x.document_path 
+              ? `<a href="${x.document_path}" target="_blank" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:0.3rem;margin-top:0.5rem">📂 Inspect Document</a>`
+              : `<span style="font-size:0.75rem;color:var(--text-secondary);font-style:italic">No document uploaded</span>`;
+
+            return `
+              <article class="verification-card" id="verification-${x.id}">
+                <div>
+                  <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem">
+                    <div class="v-icon-box">🏅</div>
+                    <div>
+                      <h4 style="font-size:1.05rem;color:var(--text-primary);margin:0">${studentName}</h4>
+                      <span style="font-size:0.72rem;color:var(--text-secondary)">Submitted: ${formatDate(x.created_at)}</span>
+                    </div>
+                  </div>
+                  
+                  <div style="display:flex;justify-content:between;align-items:center;margin:0.75rem 0;font-size:0.88rem">
+                    <span style="color:var(--text-secondary)">Requested Skill:</span>
+                    <span class="badge" style="background:rgba(13, 148, 136, 0.15);color:var(--accent);font-weight:700">${skillName}</span>
+                  </div>
+
+                  <div style="margin-bottom:1rem">
+                    ${docLink}
+                  </div>
+                </div>
+
+                <div style="display:flex;gap:0.5rem;border-top:1px solid var(--border);padding-top:1rem;margin-top:auto">
+                  <button class="btn btn-primary btn-sm approve-btn" data-id="${x.id}" style="flex:1">🟢 Approve</button>
+                  <button class="btn btn-ghost btn-sm decline-btn" data-id="${x.id}" style="flex:1;color:var(--error);border-color:rgba(239,68,68,0.1)">🔴 Decline</button>
+                </div>
+              </article>
+            `;
+          }).join('');
+
+          // Bind Approve Actions
+          listEl.querySelectorAll('.approve-btn').forEach(btn => {
+            btn.onclick = async () => {
+              const id = btn.dataset.id;
+              if (confirm("Are you sure you want to approve this student's request? This will instantly unlock their Verified Pro status!")) {
+                try {
+                  await API.put('/admin/verifications', { id: +id, status: 'approved' });
+                  showToast('Skill request successfully approved!', 'success');
+                  loadVerificationsWorkspace();
+                } catch (err) {
+                  showToast('Approval failed: ' + err.message, 'error');
+                }
+              }
+            };
+          });
+
+          // Bind Decline Actions
+          listEl.querySelectorAll('.decline-btn').forEach(btn => {
+            btn.onclick = async () => {
+              const id = btn.dataset.id;
+              if (confirm("Are you sure you want to decline this request?")) {
+                try {
+                  await API.put('/admin/verifications', { id: +id, status: 'rejected' });
+                  showToast('Verification request declined.', 'info');
+                  loadVerificationsWorkspace();
+                } catch (err) {
+                  showToast('Decline failed: ' + err.message, 'error');
+                }
+              }
+            };
+          });
+
+        } catch (err) {
+          showToast('Failed to load verification workspace: ' + err.message, 'error');
+        }
+      }
+
+      loadVerificationsWorkspace();
+    });
+  </script>
+</body>
+</html>

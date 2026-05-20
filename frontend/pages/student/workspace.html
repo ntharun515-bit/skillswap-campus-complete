@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shared Workdesk | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <style>
+    /* Workspace splits layout */
+    .workspace-layout {
+      display: grid;
+      grid-template-columns: 1.2fr 2fr;
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+    @media (max-width: 1100px) {
+      .workspace-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+    /* Timeline progress steps */
+    .timeline-bar {
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+      margin: 1.5rem 0;
+    }
+    .timeline-bar::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--border);
+      z-index: 1;
+      transform: translateY(-50%);
+    }
+    .timeline-step {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-primary);
+      border: 2px solid var(--border);
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    .timeline-step.active {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+      color: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+    }
+    .timeline-step.completed {
+      border-color: var(--success);
+      background: var(--success);
+      color: #fff;
+    }
+    /* Kanban Boards */
+    .kanban-board {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    @media (max-width: 768px) {
+      .kanban-board {
+        grid-template-columns: 1fr;
+      }
+    }
+    .kanban-col {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      padding: 0.75rem;
+      min-height: 350px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .kanban-col h3 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+      padding-bottom: 0.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .kanban-card {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 0.75rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .kanban-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+    .kanban-card h4 {
+      font-size: 0.9rem;
+      margin-bottom: 0.25rem;
+      font-weight: 700;
+    }
+    .kanban-card p {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    /* ── Workspace Chat Panel ── */
+    .ws-chat-wrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+    @media (max-width: 900px) { .ws-chat-wrap { grid-template-columns: 1fr; } }
+    .ws-chat-box {
+      display: flex;
+      flex-direction: column;
+      height: 360px;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    .ws-chat-header {
+      padding: 0.85rem 1.25rem;
+      background: var(--gradient-hero);
+      color: #fff;
+      font-weight: 700;
+      font-family: var(--font-heading);
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .ws-chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      background: var(--bg-glass);
+      backdrop-filter: blur(var(--blur));
+    }
+    .ws-msg {
+      max-width: 80%;
+      padding: 0.55rem 0.85rem;
+      border-radius: var(--radius-md);
+      font-size: 0.88rem;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .ws-msg.sent {
+      align-self: flex-end;
+      background: var(--accent);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .ws-msg.recv {
+      align-self: flex-start;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-bottom-left-radius: 4px;
+    }
+    .ws-msg .msg-meta {
+      font-size: 0.68rem;
+      opacity: 0.65;
+      margin-top: 0.2rem;
+    }
+    .ws-chat-input-row {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.65rem 0.85rem;
+      border-top: 1px solid var(--border);
+      background: var(--bg-secondary);
+    }
+    .ws-chat-input-row input {
+      flex: 1;
+      padding: 0.5rem 0.85rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+    }
+    .ws-chat-input-row button {
+      background: var(--gradient-hero);
+      border: none;
+      color: #fff;
+      border-radius: var(--radius-md);
+      padding: 0 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .ws-chat-input-row button:hover { opacity: 0.85; }
+    .ws-typing { font-size: 0.75rem; color: var(--text-secondary); padding: 0.2rem 1rem; min-height: 1.2rem; font-style: italic; }
+    /* Submission panel */
+    .submit-panel {
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .submit-panel h3 { font-size: 1rem; margin-bottom: 0.25rem; }
+    .submit-panel p { font-size: 0.85rem; color: var(--text-secondary); }
+    .submit-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    let activeTab = 'contracts'; // 'contracts' or 'teams'
+
+    initDashboard('student', 'workspace', 'Collaborative Workdesk', function(el) {
+      el.innerHTML = `
+        <!-- Workspace Tabs bar switcher -->
+        <div class="tabs-bar" style="display:flex;gap:1.5rem;margin-bottom:1.5rem;border-bottom:1px solid var(--border);padding-bottom:0.75rem">
+          <button class="tab-link active" id="tab-btn-contracts" onclick="switchWorkspaceTab('contracts')" style="background:none;border:none;color:var(--accent);font-weight:800;font-size:0.95rem;cursor:pointer;font-family:var(--font-heading);transition:color 0.2s">
+            💼 Hired Contracts Desk
+          </button>
+          <button class="tab-link" id="tab-btn-teams" onclick="switchWorkspaceTab('teams')" style="background:none;border:none;color:var(--text-secondary);font-weight:700;font-size:0.95rem;cursor:pointer;font-family:var(--font-heading);transition:color 0.2s">
+            👥 Student Team Hub
+          </button>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 1: HIRED CONTRACTS DESK -->
+        <!-- ========================================== -->
+        <div id="tab-content-contracts">
+          <div style="margin-bottom:1.5rem" id="project-selector-wrapper">
+            <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.5rem">Select Hired Workspace Project</label>
+            <select id="workspace-project-select" class="form-control" style="max-width:400px" onchange="switchWorkspaceProject()">
+              <option value="">-- Choose Campaign --</option>
+            </select>
+          </div>
+
+          <div id="workspace-root" style="display:none">
+            
+            <!-- Animated Lifecycle progress bar tracker -->
+            <article class="glass card" style="margin-bottom:1.5rem">
+              <h2>🎯 Project Lifecycle Progress</h2>
+              <div class="timeline-bar" id="timeline-progressbar">
+                <div class="timeline-step" id="step-open" title="Open Recruitment">1</div>
+                <div class="timeline-step" id="step-in_progress" title="In Development">2</div>
+                <div class="timeline-step" id="step-submitted" title="Submitted for Review">3</div>
+                <div class="timeline-step" id="step-completed" title="Completed & Released">4</div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.5rem">
+                <span id="lifecycle-status-label" style="font-weight:700;color:var(--accent)">Status: In Progress</span>
+                <button class="btn btn-primary btn-sm" id="submit-deliverables-btn" onclick="openDeliverablesModal()">📤 Submit Deliverables</button>
+              </div>
+            </article>
+
+            <div class="workspace-layout">
+              
+              <!-- LEFT COLUMN: MILESTONES & DOCUMENTS -->
+              <div style="display:flex;flex-direction:column;gap:1.5rem">
+                
+                <!-- Escrow Milestone releases -->
+                <article class="glass card">
+                  <h2>💳 Virtual Escrow Milestone</h2>
+                  <div style="margin-top:1rem;padding:1rem;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--radius-lg)">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:0.5rem">
+                      <span style="font-size:0.85rem;color:var(--text-secondary)">Escrow Amount</span>
+                      <strong style="color:var(--success)" id="escrow-budget">0.00 Cr</strong>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;margin-bottom:1rem">
+                      <span style="font-size:0.85rem;color:var(--text-secondary)">Milestone Note</span>
+                      <span style="font-size:0.85rem" id="escrow-milestone">Direct Contract</span>
+                    </div>
+                    <div style="display:flex;gap:0.75rem">
+                      <button class="btn btn-ghost btn-sm" style="flex:1" onclick="triggerMilestoneDispute()">⚠️ Raise Dispute</button>
+                    </div>
+                  </div>
+                </article>
+
+                <!-- Shared File Attachments drawer -->
+                <article class="glass card">
+                  <h2>📂 Work deliverables Drawer</h2>
+                  <p style="font-size:0.82rem;color:var(--text-secondary);margin-top:0.25rem">Upload live Vercel deployments, GitHub links, or image previews.</p>
+                  
+                  <div style="display:flex;gap:0.5rem;margin-top:1rem">
+                    <input type="text" id="work-file-title" class="form-control" placeholder="Attachment Title" style="flex:1">
+                    <input type="text" id="work-file-path" class="form-control" placeholder="URL or Preview path" style="flex:1.5">
+                    <button class="btn btn-primary" onclick="uploadWorkDeliverable()">Attach</button>
+                  </div>
+
+                  <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:1.25rem" id="shared-files-list">
+                    <p style="color:var(--text-secondary);font-size:0.85rem">No attachments shared yet.</p>
+                  </div>
+                </article>
+
+                <!-- Running timeline logs -->
+                <article class="glass card">
+                  <h3>📜 Workspace Activity Log</h3>
+                  <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:1rem;max-height:200px;overflow-y:auto" id="workspace-activity-logs">
+                    <p style="color:var(--text-secondary);font-size:0.85rem">No events logged yet.</p>
+                  </div>
+                </article>
+
+              </div>
+
+              <!-- RIGHT COLUMN: COLLABORATIVE KANBAN BOARD -->
+              <article class="glass card">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <h2>📋 Linear Workspace Taskboard</h2>
+                  <button class="btn btn-primary btn-sm" onclick="openAddTaskModal()">+ Create Card</button>
+                </div>
+                <p style="font-size:0.85rem;color:var(--text-secondary);margin-top:0.25rem">Organize, claim, and advance task items in real-time.</p>
+                
+                <div class="kanban-board">
+                  <div class="kanban-col" id="col-todo">
+                    <h3>To Do <span class="badge" id="badge-todo">0</span></h3>
+                    <div class="column-cards" id="cards-todo" style="display:flex;flex-direction:column;gap:0.5rem"></div>
+                  </div>
+                  <div class="kanban-col" id="col-in_progress">
+                    <h3>In Progress <span class="badge" id="badge-in_progress">0</span></h3>
+                    <div class="column-cards" id="cards-in_progress" style="display:flex;flex-direction:column;gap:0.5rem"></div>
+                  </div>
+                  <div class="kanban-col" id="col-review">
+                    <h3>In Review <span class="badge" id="badge-review">0</span></h3>
+                    <div class="column-cards" id="cards-review" style="display:flex;flex-direction:column;gap:0.5rem"></div>
+                  </div>
+                  <div class="kanban-col" id="col-done">
+                    <h3>Completed <span class="badge" id="badge-done">0</span></h3>
+                    <div class="column-cards" id="cards-done" style="display:flex;flex-direction:column;gap:0.5rem"></div>
+                  </div>
+                </div>
+              </article>
+
+            </div>
+
+            <!-- CHAT + SUBMISSION PANEL -->
+            <div class="ws-chat-wrap" id="ws-bottom-panels">
+              <!-- Real-time Project Chat -->
+              <div class="glass ws-chat-box" id="ws-chat-panel">
+                <div class="ws-chat-header">💬 Project Chat <span id="ws-other-name" style="font-weight:400;font-size:0.82rem;opacity:0.85"></span></div>
+                <div class="ws-chat-messages" id="ws-chat-messages">
+                  <p style="color:var(--text-secondary);font-size:0.85rem;text-align:center;padding-top:2rem">Select a project to load chat…</p>
+                </div>
+                <div class="ws-typing" id="ws-typing-indicator"></div>
+                <div class="ws-chat-input-row">
+                  <input type="text" id="ws-chat-input" placeholder="Type a message…" onkeydown="wsChatKeydown(event)">
+                  <button class="btn btn-primary btn-sm" onclick="wsSendMsg()">Send</button>
+                </div>
+              </div>
+
+              <!-- Submit Deliverables Panel -->
+              <div class="glass card submit-panel" id="ws-submit-panel">
+                <div>
+                  <h3>📤 Submit Your Work</h3>
+                  <p>Upload your final deliverable link and a handoff note. The client will be notified to review and release your payment.</p>
+                </div>
+                <div id="ws-submit-status"></div>
+                <div id="ws-submit-form">
+                  <div class="form-group" style="margin-bottom:0.75rem">
+                    <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.35rem">Deliverable URL</label>
+                    <input type="url" id="ws-deliver-url" class="form-control" placeholder="https://github.com/… or https://vercel.app/…">
+                  </div>
+                  <div class="form-group" style="margin-bottom:1rem">
+                    <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.35rem">Handoff Note</label>
+                    <textarea id="ws-deliver-note" class="form-control" rows="3" placeholder="All requirements completed. See README for setup…"></textarea>
+                  </div>
+                  <button class="btn btn-primary" style="width:100%" onclick="wsSubmitWork()">🚀 Submit for Client Review</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: STUDENT TEAM HUB (NEW ADVANCED MODULE) -->
+        <!-- ========================================== -->
+        <div id="tab-content-teams" style="display:none">
+          <div style="display:grid;grid-template-columns:1.2fr 2fr;gap:1.5rem">
+            
+            <!-- LEFT SQUAD SIDEBAR: TEAMS LIST & INVITES -->
+            <div style="display:flex;flex-direction:column;gap:1.5rem">
+              
+              <!-- Active Teams selector -->
+              <article class="glass card">
+                <h2>👥 Team collectives</h2>
+                <p style="font-size:0.8rem;color:var(--text-secondary)">Choose or establish student dev collectives.</p>
+                
+                <div style="margin:1rem 0;display:flex;flex-direction:column;gap:0.5rem" id="teams-list-group">
+                  <p style="color:var(--text-secondary);font-size:0.85rem">Loading squads...</p>
+                </div>
+              </article>
+
+              <!-- Create New Collective form -->
+              <article class="glass card">
+                <h3>➕ Found New Team</h3>
+                <div style="margin-top:1rem;display:flex;flex-direction:column;gap:0.75rem">
+                  <div class="form-group">
+                    <label style="font-size:0.78rem;font-weight:600">Collective Name</label>
+                    <input type="text" id="new-team-name" class="form-control" placeholder="e.g. PixelPioneers Devs">
+                  </div>
+                  <div class="form-group">
+                    <label style="font-size:0.78rem;font-weight:600">Description</label>
+                    <textarea id="new-team-desc" class="form-control" rows="2" placeholder="Slogan / technology specialization..."></textarea>
+                  </div>
+                  <button class="btn btn-primary" style="width:100%" onclick="createNewTeamCollective()">🚀 Form Collective</button>
+                </div>
+              </article>
+
+              <!-- Pending Invitations received -->
+              <article class="glass card">
+                <h3>✉️ Team Invites Drawer</h3>
+                <div style="display:flex;flex-direction:column;gap:0.5rem;margin-top:1rem" id="team-invitations-list">
+                  <p style="color:var(--text-secondary);font-size:0.85rem">No pending invites.</p>
+                </div>
+              </article>
+
+            </div>
+
+            <!-- RIGHT MAIN PANEL: COLLABORATIVE HUB -->
+            <div style="display:flex;flex-direction:column;gap:1.5rem" id="team-hub-details-panel">
+              <article class="glass card" style="text-align:center;padding:5rem;color:var(--text-secondary)">
+                <span style="font-size:3.5rem">👥</span>
+                <h3 style="margin-top:1rem">Select or Form a Team Collective</h3>
+                <p style="font-size:0.85rem;max-width:320px;margin:0.5rem auto 0">Establish custom agencies, claim hired escrow campaigns, and develop collectively.</p>
+              </article>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Create Task modal layout overlay -->
+        <div class="overlay-modal" id="task-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:999;align-items:center;justify-content:center">
+          <div class="glass card" style="max-width:450px;width:90%">
+            <h2>Create Task Card</h2>
+            <div style="margin-top:1.25rem">
+              <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.25rem">Card Title</label>
+              <input type="text" id="modal-task-title" class="form-control" style="width:100%;margin-bottom:0.75rem">
+              
+              <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.25rem">Description</label>
+              <textarea id="modal-task-desc" class="form-control" style="width:100%;height:80px;margin-bottom:0.75rem"></textarea>
+
+              <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.25rem">Starting Column</label>
+              <select id="modal-task-col" class="form-control" style="width:100%;margin-bottom:1rem">
+                <option value="todo">To Do</option>
+                <option value="in_progress">In Progress</option>
+                <option value="review">In Review</option>
+              </select>
+            </div>
+            <div style="display:flex;justify-content:end;gap:0.75rem">
+              <button class="btn btn-ghost" onclick="closeTaskModal()">Cancel</button>
+              <button class="btn btn-primary" onclick="createTaskCard()">Save Card</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit deliverables overlay modal -->
+        <div class="overlay-modal" id="deliver-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:999;align-items:center;justify-content:center">
+          <div class="glass card" style="max-width:450px;width:90%">
+            <h2>Submit Deliverables for Review</h2>
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin-top:0.25rem">Submit links and logs to notify the client for Escrow release approval.</p>
+            <div style="margin-top:1.25rem">
+              <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.25rem">Submission URL (GitHub / Figma / Vercel)</label>
+              <input type="text" id="deliver-preview-url" class="form-control" placeholder="https://..." style="width:100%;margin-bottom:0.75rem">
+              
+              <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.25rem">Handoff Note / Message</label>
+              <textarea id="deliver-note" class="form-control" placeholder="All requirements completed, ready for final inspect..." style="width:100%;height:80px;margin-bottom:1rem"></textarea>
+            </div>
+            <div style="display:flex;justify-content:end;gap:0.75rem">
+              <button class="btn btn-ghost" onclick="closeDeliverModal()">Cancel</button>
+              <button class="btn btn-primary" onclick="submitProjectDeliverable()">Submit Deliverables</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Load initial lists
+      loadWorkspaceProjects();
+      loadStudentTeams();
+      loadTeamInvitations();
+    });
+
+    // Tab Switcher handler
+    function switchWorkspaceTab(tab) {
+      activeTab = tab;
+      
+      const contractsBtn = document.getElementById('tab-btn-contracts');
+      const teamsBtn = document.getElementById('tab-btn-teams');
+      const contractsContent = document.getElementById('tab-content-contracts');
+      const teamsContent = document.getElementById('tab-content-teams');
+
+      if (tab === 'contracts') {
+        contractsBtn.classList.add('active');
+        contractsBtn.style.color = 'var(--accent)';
+        teamsBtn.classList.remove('active');
+        teamsBtn.style.color = 'var(--text-secondary)';
+        contractsContent.style.display = 'block';
+        teamsContent.style.display = 'none';
+      } else {
+        teamsBtn.classList.add('active');
+        teamsBtn.style.color = 'var(--accent)';
+        contractsBtn.classList.remove('active');
+        contractsBtn.style.color = 'var(--text-secondary)';
+        contractsContent.style.display = 'none';
+        teamsContent.style.display = 'block';
+        loadStudentTeams();
+        loadTeamInvitations();
+      }
+    }
+
+    // =========================================================================
+    // 💼 CONTRACTS WORKSPACE LOGIC
+    // =========================================================================
+    function loadWorkspaceProjects() {
+      API.get('/projects/my').then(projs => {
+        const select = document.getElementById('workspace-project-select');
+        const activeCampaigns = projs.filter(p => p.status !== 'open' && p.status !== 'draft');
+        
+        if (activeCampaigns.length === 0) {
+          select.innerHTML = '<option value="">-- No Active Contracts Found --</option>';
+          return;
+        }
+
+        select.innerHTML = '<option value="">-- Choose Hired Project --</option>' + activeCampaigns.map(p => `
+          <option value="${p.id}">${p.title} (${p.status.toUpperCase()})</option>
+        `).join('');
+
+        // Auto-select project from URL ?project=ID
+        const urlPid = new URLSearchParams(location.search).get('project');
+        if (urlPid) {
+          select.value = urlPid;
+          switchWorkspaceProject();
+        }
+      }).catch(err => {
+        showToast('Failed to load contract directory: ' + err.message, 'error');
+      });
+    }
+
+    function switchWorkspaceProject() {
+      const pid = document.getElementById('workspace-project-select').value;
+      if (!pid) {
+        document.getElementById('workspace-root').style.display = 'none';
+        return;
+      }
+      
+      document.getElementById('workspace-root').style.display = 'block';
+      refreshWorkspaceData(pid);
+    }
+
+    function refreshWorkspaceData(pid) {
+      Promise.all([
+        API.get(`/projects/${pid}`),
+        API.get(`/projects/${pid}/timeline`),
+        API.get(`/projects/${pid}/kanban`),
+        API.get(`/projects/${pid}/files`),
+        API.get(`/projects/${pid}/payments`)
+      ]).then(([project, timeline, tasks, files, payments]) => {
+        
+        // 1. Sync Progress Timeline nodes
+        document.getElementById('lifecycle-status-label').textContent = `Status: ${project.status.toUpperCase()}`;
+        
+        const steps = ['open', 'in_progress', 'submitted', 'completed'];
+        const currentIdx = steps.indexOf(project.status.toLowerCase());
+        
+        steps.forEach((step, idx) => {
+          const node = document.getElementById(`step-${step}`);
+          if (node) {
+            node.className = 'timeline-step';
+            if (idx < currentIdx) {
+              node.classList.add('completed');
+            } else if (idx === currentIdx) {
+              node.classList.add('active');
+            }
+          }
+        });
+
+        // Hide/Show deliverables button depending on active status
+        const submitBtn = document.getElementById('submit-deliverables-btn');
+        if (project.status.toLowerCase() === 'in_progress') {
+          submitBtn.style.display = 'block';
+        } else {
+          submitBtn.style.display = 'none';
+        }
+
+        // 2. Render Escrow card
+        const escrow = payments.find(p => p.status === 'escrowed' || p.status === 'disputed');
+        if (escrow) {
+          document.getElementById('escrow-budget').textContent = escrow.amount.toFixed(2) + ' Cr';
+          document.getElementById('escrow-milestone').textContent = escrow.milestone || 'Project Escrow Deposit';
+        } else {
+          document.getElementById('escrow-budget').textContent = 'Released / Completed';
+          document.getElementById('escrow-milestone').textContent = 'Escrow Ledger closed';
+        }
+
+        // 3. Render Shared work files
+        const filesContainer = document.getElementById('shared-files-list');
+        if (!files || files.length === 0) {
+          filesContainer.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem">No attachments shared yet.</p>';
+        } else {
+          filesContainer.innerHTML = files.map(f => `
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.75rem;border-radius:var(--radius-sm);background:rgba(255,255,255,0.01);border:1px solid var(--border)">
+              <span style="font-size:0.85rem;font-weight:700">${f.filename}</span>
+              <a href="${f.file_path}" target="_blank" class="btn btn-ghost btn-sm" style="margin-left:auto">🔗 View Link</a>
+            </div>
+          `).join('');
+        }
+
+        // 4. Render Running Timeline logs
+        const logsContainer = document.getElementById('workspace-activity-logs');
+        if (!timeline || timeline.length === 0) {
+          logsContainer.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem">No events logged yet.</p>';
+        } else {
+          logsContainer.innerHTML = timeline.map(t => `
+            <div style="padding:0.4rem;border-left:2px solid var(--accent);padding-left:0.75rem;margin-bottom:0.4rem">
+              <div style="font-size:0.8rem;font-weight:700">${t.details || t.status}</div>
+              <span style="font-size:0.7rem;color:var(--text-secondary)">${formatDate(t.created_at)}</span>
+            </div>
+          `).join('');
+        }
+
+        // 5. Render Linear Taskboard Columns
+        const columns = ['todo', 'in_progress', 'review', 'done'];
+        columns.forEach(col => {
+          const colTasks = tasks.filter(t => t.column === col);
+          document.getElementById(`badge-${col}`).textContent = colTasks.length;
+          
+          const colCards = document.getElementById(`cards-${col}`);
+          colCards.innerHTML = colTasks.map(t => `
+            <div class="kanban-card" onclick="advanceKanbanTask(${t.id}, '${t.column}')">
+              <h4>${t.title}</h4>
+              <p>${t.description || 'No description provided.'}</p>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.5rem;font-size:0.7rem;color:var(--accent)">
+                <span>${t.column.replace('_', ' ').toUpperCase()}</span>
+                <span>⚡ Move</span>
+              </div>
+            </div>
+          `).join('');
+        });
+
+        // 6. Init workspace chat
+        wsInitChat(project);
+
+      }).catch(err => {
+        showToast('Workspace sync failure: ' + err.message, 'error');
+      });
+    }
+
+    // Kanban Actions
+    function openAddTaskModal() {
+      document.getElementById('task-modal').style.display = 'flex';
+    }
+    function closeTaskModal() {
+      document.getElementById('task-modal').style.display = 'none';
+    }
+    function createTaskCard() {
+      const pid = document.getElementById('workspace-project-select').value;
+      const title = document.getElementById('modal-task-title').value;
+      const desc = document.getElementById('modal-task-desc').value;
+      const col = document.getElementById('modal-task-col').value;
+
+      if (!title) {
+        showToast('Card title is required!', 'warning');
+        return;
+      }
+
+      API.post(`/projects/${pid}/kanban`, {
+        title: title,
+        description: desc,
+        column: col
+      }).then(() => {
+        showToast('Kanban card created!', 'success');
+        closeTaskModal();
+        
+        // Reset modal fields
+        document.getElementById('modal-task-title').value = '';
+        document.getElementById('modal-task-desc').value = '';
+
+        refreshWorkspaceData(pid);
+      }).catch(err => {
+        showToast('Card creation failed: ' + err.message, 'error');
+      });
+    }
+
+    function advanceKanbanTask(taskId, currentColumn) {
+      const pid = document.getElementById('workspace-project-select').value;
+      const nextColumns = {
+        'todo': 'in_progress',
+        'in_progress': 'review',
+        'review': 'done',
+        'done': 'todo'
+      };
+      
+      const nextCol = nextColumns[currentColumn];
+      API.put(`/projects/kanban/${taskId}`, { column: nextCol }).then(() => {
+        showToast('Task advanced successfully!', 'success');
+        refreshWorkspaceData(pid);
+      }).catch(err => {
+        showToast('Failed to shift task: ' + err.message, 'error');
+      });
+    }
+
+    // File attachments uploads
+    function uploadWorkDeliverable() {
+      const pid = document.getElementById('workspace-project-select').value;
+      const title = document.getElementById('work-file-title').value;
+      const path = document.getElementById('work-file-path').value;
+
+      if (!title || !path) {
+        showToast('Title and URL/Path required!', 'warning');
+        return;
+      }
+
+      API.post(`/projects/${pid}/files`, {
+        filename: title,
+        file_path: path
+      }).then(() => {
+        showToast('Work attachment uploaded!', 'success');
+        
+        // Reset fields
+        document.getElementById('work-file-title').value = '';
+        document.getElementById('work-file-path').value = '';
+
+        refreshWorkspaceData(pid);
+      }).catch(err => {
+        showToast('Attachment upload failed: ' + err.message, 'error');
+      });
+    }
+
+  </script>
+</body>
+</html>

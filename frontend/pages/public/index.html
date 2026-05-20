@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SkillSwap — Next-Gen Student Talent Marketplace</title>
+  <meta name="description" content="SkillSwap connects university students with real freelance projects. Hire verified campus talent for coding, design, tutoring, and writing — secured by smart escrow.">
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <style>
+    .hero-glow-title {
+      font-size: clamp(2.6rem, 7vw, 4.4rem);
+      line-height: 1.05;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      margin-bottom: 1.5rem;
+      background: var(--gradient-hero);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .landing-subtitle {
+      font-size: 1.2rem;
+      color: var(--text-secondary);
+      max-width: 720px;
+      margin: 0 auto 2.5rem;
+      line-height: 1.65;
+    }
+    .stats-flex {
+      display: flex; justify-content: center; gap: 2.5rem; margin-top: 3.5rem; flex-wrap: wrap;
+    }
+    .stat-box { text-align: center; padding: 1.25rem 2rem; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-glass); backdrop-filter: blur(var(--blur)); min-width: 140px; transition: transform 0.3s, border-color 0.3s; }
+    .stat-box:hover { transform: translateY(-4px); border-color: var(--accent); }
+    .stat-number { font-family: var(--font-heading); font-size: 2.5rem; font-weight: 800; color: var(--accent); line-height: 1; }
+    .stat-label { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); margin-top: 0.4rem; font-weight: 700; }
+    .feature-icon { font-size: 2.25rem; margin-bottom: 1rem; display: inline-block; }
+    .sec-heading { font-size: 2.1rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.5rem; font-family: var(--font-heading); }
+    .sec-sub { color: var(--text-secondary); max-width: 560px; margin: 0 auto; font-size: 1.05rem; line-height: 1.6; }
+    .step-num { width: 48px; height: 48px; border-radius: 50%; background: var(--gradient-hero); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.15rem; margin-bottom: 1rem; flex-shrink: 0; }
+    .how-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 2rem 1.5rem; }
+    .how-card h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+    .how-card p { font-size: 0.92rem; color: var(--text-secondary); line-height: 1.55; }
+    .trust-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem; margin-top: 2.5rem; }
+    .trust-card { padding: 1.75rem; text-align: center; }
+    .trust-card h4 { font-size: 1rem; margin: 0.75rem 0 0.4rem; }
+    .trust-card p { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; }
+    .testimonial-card { padding: 2rem; position: relative; }
+    .testimonial-card blockquote { font-size: 1rem; line-height: 1.65; font-style: italic; color: var(--text-primary); margin: 0 0 1rem; }
+    .testimonial-card cite { font-size: 0.85rem; color: var(--text-secondary); font-style: normal; font-weight: 700; }
+    .tech-pill { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1.1rem; border-radius: 999px; font-size: 0.85rem; font-weight: 600; border: 1px solid var(--border); background: var(--bg-glass); }
+    .cta-banner { padding: 4rem 2rem; text-align: center; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--bg-glass); backdrop-filter: blur(var(--blur)); }
+    .cta-banner h2 { font-size: 2rem; font-weight: 800; margin-bottom: 1rem; }
+    .cta-banner p { font-size: 1.05rem; color: var(--text-secondary); max-width: 550px; margin: 0 auto 2rem; }
+  </style>
+</head>
+<body>
+  <div id="nav"></div>
+
+  <main id="main">
+    <!-- ══════════ HERO ══════════ -->
+    <section class="hero container" style="padding: 7rem 0 4rem; text-align: center;">
+      <span class="badge" style="margin-bottom:1.5rem;display:inline-block;background:var(--accent-glow);color:var(--accent);font-weight:700;font-size:0.82rem;padding:0.4rem 1rem;border-radius:999px;border:1px solid var(--accent)">🚀 Trusted by 50+ University Campuses</span>
+      <h1 class="hero-glow-title">Where Campus Talent<br>Meets Real Opportunity</h1>
+      <p class="landing-subtitle">
+        SkillSwap is the all-in-one freelance ecosystem built exclusively for university students.
+        Post projects, hire verified peers, manage work through collaborative workspaces,
+        and transact securely with our smart escrow credit system — all within your campus network.
+      </p>
+      <div class="hero-actions">
+        <a href="register.html" class="btn btn-primary btn-lg">Create Free Account</a>
+        <a href="projects.html" class="btn btn-ghost btn-lg">Browse Open Projects</a>
+      </div>
+
+      <!-- Live Platform Stats -->
+      <div class="stats-flex" id="live-stats">
+        <div class="stat-box">
+          <div class="stat-number" id="s-projects">—</div>
+          <div class="stat-label">Active Projects</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number" id="s-freelancers">—</div>
+          <div class="stat-label">Verified Freelancers</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number" id="s-credits">—</div>
+          <div class="stat-label">Credits Exchanged</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-number">< 1s</div>
+          <div class="stat-label">Real-Time Messaging</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ HOW IT WORKS ══════════ -->
+    <section class="section container" style="padding: 4rem 0 5rem;">
+      <div style="text-align: center; margin-bottom: 3.5rem;">
+        <h2 class="sec-heading">How SkillSwap Works</h2>
+        <p class="sec-sub">From project posting to payment release — a seamless four-step lifecycle designed for zero friction.</p>
+      </div>
+      <div class="grid grid-4" style="gap:1.25rem">
+        <article class="glass card how-card">
+          <div class="step-num">1</div>
+          <h3>Post a Project</h3>
+          <p>Clients describe their needs, set a budget in campus credits, and define the required skills and deadline.</p>
+        </article>
+        <article class="glass card how-card">
+          <div class="step-num">2</div>
+          <h3>Hire Verified Talent</h3>
+          <p>Review proposals from skill-verified students, compare bids, and hire with a single click. Funds are locked in escrow instantly.</p>
+        </article>
+        <article class="glass card how-card">
+          <div class="step-num">3</div>
+          <h3>Collaborate in Workspace</h3>
+          <p>Manage tasks on a Kanban board, share deliverables, chat in real-time, and track progress through the project timeline.</p>
+        </article>
+        <article class="glass card how-card">
+          <div class="step-num">4</div>
+          <h3>Review & Release Payment</h3>
+          <p>Once work is submitted, review deliverables and approve. Credits are released from escrow to the freelancer instantly.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ══════════ PLATFORM FEATURES ══════════ -->
+    <section class="section container" style="padding: 3rem 0 5rem;">
+      <div style="text-align: center; margin-bottom: 3.5rem;">
+        <h2 class="sec-heading">Built for the Modern Campus</h2>
+        <p class="sec-sub">A full SaaS platform packed with enterprise-grade features — adapted for student workflows.</p>
+      </div>
+      <div class="grid grid-3" style="gap:1.25rem">
+        <article class="glass card" style="padding:2rem">
+          <div class="feature-icon">🛡️</div>
+          <h3 style="font-size:1.15rem;margin-bottom:0.5rem">Smart Escrow Protection</h3>
+          <p>Funds are locked the moment you hire. Neither party can lose — credits are held securely until work is approved or disputed through admin mediation.</p>
+        </article>
+        <article class="glass card" style="padding:2rem">
+          <div class="feature-icon">🤖</div>
+          <h3 style="font-size:1.15rem;margin-bottom:0.5rem">AI-Powered Matching</h3>
+          <p>Our intelligent recommendation engine analyzes skills, past ratings, and project requirements to surface the best freelancer-project matches automatically.</p>
+        </article>
+        <article class="glass card" style="padding:2rem">
+          <div class="feature-icon">📋</div>
+          <h3 style="font-size:1.15rem;margin-bottom:0.5rem">Collaborative Workspaces</h3>
+          <p>Built-in Kanban task boards, shared file drawers, project timelines, and lifecycle progress tracking — all inside one shared workspace per project.</p>
+        </article>
+        <article class="glass card" style="padding:2rem">
+          <div class="feature-icon">💬</div>
+          <h3 style="font-size:1.15rem;margin-bottom:0.5rem">Real-Time Communication</h3>
+          <p>Socket.IO-powered instant messaging with typing indicators, read receipts, and workspace-embedded project chat. No context switching needed.</p>
+        </article>
+        <article class="glass card" style="padding:2rem">
+          <div class="feature-icon">🏆</div>
+          <h3 style="font-size:1.15rem;margin-bottom:0.5rem">Gamified Reputation</h3>
+          <p>XP points, achievement badges, campus leaderboards, streak tracking, and skill verification quizzes — building real professional credibility.</p>
+        </article>
+        <article class="glass card" style="padding:2rem">
+          <div class="feature-icon">📊</div>
+          <h3 style="font-size:1.15rem;margin-bottom:0.5rem">Analytics & Insights</h3>
+          <p>Client dashboards with spending trends, freelancer earnings charts, project completion rates, and admin-level platform revenue analytics.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ══════════ TRUST & SECURITY ══════════ -->
+    <section class="section container" style="padding: 3rem 0 5rem;">
+      <div style="text-align:center;margin-bottom:2rem">
+        <h2 class="sec-heading">Enterprise-Grade Trust Infrastructure</h2>
+        <p class="sec-sub">Every transaction, identity, and interaction is secured by multiple layers of protection.</p>
+      </div>
+      <div class="trust-grid">
+        <article class="glass card trust-card">
+          <div style="font-size:2rem">🔐</div>
+          <h4>JWT + Session Auth</h4>
+          <p>Industry-standard JSON Web Token authentication with secure httpOnly cookies, automatic refresh rotation, and session binding.</p>
+        </article>
+        <article class="glass card trust-card">
+          <div style="font-size:2rem">🧹</div>
+          <h4>XSS & Injection Shield</h4>
+          <p>All user inputs are sanitized through Bleach before storage. SQL injection is prevented via SQLAlchemy ORM parameterized queries.</p>
+        </article>
+        <article class="glass card trust-card">
+          <div style="font-size:2rem">⚖️</div>
+          <h4>Dispute Resolution</h4>
+          <p>Built-in dispute filing with evidence attachments. Admin mediators review cases and can freeze, refund, or release escrowed funds.</p>
+        </article>
+        <article class="glass card trust-card">
+          <div style="font-size:2rem">📜</div>
+          <h4>Activity Audit Logging</h4>
+          <p>Every login, transaction, hire, and status change is logged with timestamps and IP addresses for full accountability and transparency.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ══════════ TECHNOLOGY STACK ══════════ -->
+    <section class="section container" style="padding: 2rem 0 5rem; text-align: center;">
+      <h2 class="sec-heading">Powered by Modern Technology</h2>
+      <p class="sec-sub" style="margin-bottom:2rem">Production-ready architecture using battle-tested open-source technologies.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:0.75rem;justify-content:center">
+        <span class="tech-pill">🐍 Python / Flask</span>
+        <span class="tech-pill">🗄️ SQLAlchemy ORM</span>
+        <span class="tech-pill">🔌 Socket.IO</span>
+        <span class="tech-pill">🔑 Flask-JWT-Extended</span>
+        <span class="tech-pill">🎨 Vanilla CSS</span>
+        <span class="tech-pill">⚡ JavaScript ES6+</span>
+        <span class="tech-pill">🧹 Bleach Sanitization</span>
+        <span class="tech-pill">🐳 Docker Ready</span>
+        <span class="tech-pill">📦 SQLite / MySQL</span>
+        <span class="tech-pill">🤖 AI / NLP Engine</span>
+      </div>
+    </section>
+
+    <!-- ══════════ CTA BANNER ══════════ -->
+    <section class="section container" style="padding: 0 0 5rem;">
+      <div class="cta-banner">
+        <h2>Ready to Turn Your Skills into Campus Currency?</h2>
+        <p>Join thousands of students already building real portfolios, earning credits, and gaining professional experience — all within their university network.</p>
+        <a href="register.html" class="btn btn-primary btn-lg">Get Started — It's Free</a>
+      </div>
+    </section>
+  </main>
+
+  <div id="footer"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+
+  <script>
+    document.getElementById('nav').innerHTML = renderNavbar('home');
+    document.getElementById('footer').innerHTML = renderFooter();
+
+    // Pull live stats from the API
+    (async () => {
+      try {
+        const [projects, freelancers] = await Promise.all([
+          fetch(CONFIG.API_BASE + '/projects').then(r => r.json()).catch(() => []),
+          fetch(CONFIG.API_BASE + '/users/freelancers').then(r => r.json()).catch(() => [])
+        ]);
+        document.getElementById('s-projects').textContent = projects.length || '0';
+        document.getElementById('s-freelancers').textContent = freelancers.length || '0';
+        const totalBudget = projects.reduce((s, p) => s + (p.budget || 0), 0);
+        document.getElementById('s-credits').textContent = totalBudget > 1000 ? (totalBudget / 1000).toFixed(1) + 'k' : totalBudget.toFixed(0);
+      } catch(e) {}
+    })();
+  </script>
+</body>
+</html>

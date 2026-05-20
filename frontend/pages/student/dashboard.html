@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <style>
+    .sdash{display:grid;grid-template-columns:1fr 310px;gap:1.5rem;margin-top:1.25rem}
+    @media(max-width:960px){.sdash{grid-template-columns:1fr}}
+    .xp-outer{width:100%;height:8px;border-radius:99px;background:var(--bg-secondary);overflow:hidden;margin-top:.4rem}
+    .xp-inner{height:100%;border-radius:99px;background:var(--gradient-hero);transition:width .6s ease}
+    .ql{display:flex;align-items:center;gap:.65rem;padding:.6rem .85rem;border-radius:var(--radius-md);border:1px solid var(--border);margin-bottom:.4rem;cursor:pointer;transition:border-color .2s,background .2s;text-decoration:none;color:var(--text-primary)}
+    .ql:hover{border-color:var(--accent);background:var(--accent-glow)}
+    .ql-icon{font-size:1.1rem;flex-shrink:0}
+    .ql-title{font-weight:600;font-size:.82rem}
+    .badge-pill{display:inline-flex;align-items:center;gap:.3rem;padding:.3rem .7rem;border-radius:var(--radius-sm);font-size:.78rem;font-weight:600;border:1px solid var(--border)}
+    .badge-on{background:var(--accent-glow);color:var(--accent);border-color:var(--accent)}
+    .badge-off{color:var(--text-secondary);opacity:.45}
+
+    /* Interactive Earnings SVG Chart */
+    .chart-card {
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .chart-svg {
+      width: 100%;
+      height: 165px;
+      overflow: visible;
+    }
+    .chart-path {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 3.5;
+      stroke-linecap: round;
+    }
+    .chart-grid {
+      stroke: var(--border);
+      stroke-width: 1;
+      stroke-dasharray: 4 4;
+      opacity: 0.5;
+    }
+    .chart-point-group:hover circle {
+      r: 7;
+      fill: var(--accent-hover);
+      filter: drop-shadow(0 0 6px var(--accent));
+      transition: all 0.2s ease;
+    }
+    
+    /* Milestone checklist */
+    .milestone-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem 0.85rem;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      margin-bottom: 0.4rem;
+      font-size: 0.82rem;
+    }
+    .milestone-checkbox {
+      width: 1.1rem;
+      height: 1.1rem;
+      cursor: pointer;
+    }
+    
+    /* Bookmarks list cards */
+    .bookmark-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.02);
+      margin-bottom: 0.4rem;
+      text-decoration: none;
+    }
+    .bookmark-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .bookmark-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+    }
+    
+    /* AI Pathways */
+    .pathway-item {
+      padding: 0.75rem;
+      border-radius: var(--radius-md);
+      background: var(--gradient-subtle);
+      border: 1px solid var(--border);
+      margin-bottom: 0.5rem;
+      font-size: 0.82rem;
+    }
+    .pathway-title {
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 0.15rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+  <script>
+    initDashboard('student', 'dashboard', 'Dashboard', function(el) {
+      el.innerHTML = `
+        <div class="stats-grid" id="st">
+          <div class="glass card skeleton" style="height:80px"></div>
+          <div class="glass card skeleton" style="height:80px"></div>
+          <div class="glass card skeleton" style="height:80px"></div>
+          <div class="glass card skeleton" style="height:80px"></div>
+        </div>
+
+        <div class="sdash">
+          <div style="display:flex;flex-direction:column;gap:1.25rem">
+            <!-- XP Progress -->
+            <article class="glass card" id="xp-card" style="padding:1.25rem 1.5rem">
+              <div id="xp-content"><div class="skeleton" style="height:40px"></div></div>
+            </article>
+
+            <!-- Interactive Earnings Analytics Chart -->
+            <article class="glass card chart-card">
+              <h3 style="font-size:.95rem;margin-bottom:.75rem">Earnings Flow (Credits)</h3>
+              <svg class="chart-svg" id="earnings-chart-svg" viewBox="0 0 380 165">
+                <defs>
+                  <linearGradient id="chart-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3"></stop>
+                    <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.0"></stop>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </article>
+
+            <!-- Milestone Checklist -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 style="font-size:1rem;margin-bottom:.75rem">Active Milestone Checkpoints</h3>
+              <div id="milestones-container">
+                <div class="milestone-item">
+                  <input type="checkbox" checked class="milestone-checkbox" disabled>
+                  <span style="text-decoration:line-through; color:var(--text-secondary)">Verify initial project requirements & specs</span>
+                </div>
+                <div class="milestone-item">
+                  <input type="checkbox" checked class="milestone-checkbox" disabled>
+                  <span style="text-decoration:line-through; color:var(--text-secondary)">Build frontend layout and dark obsidian wireframes</span>
+                </div>
+                <div class="milestone-item">
+                  <input type="checkbox" class="milestone-checkbox" id="m3" onchange="showToast('Checkpoint progress saved!', 'success')">
+                  <span>Connect backend Flask routers & DB triggers</span>
+                </div>
+                <div class="milestone-item">
+                  <input type="checkbox" class="milestone-checkbox" id="m4" onchange="showToast('Final release requested!', 'info')">
+                  <span>Submit final project build and request escrow release</span>
+                </div>
+              </div>
+            </article>
+
+            <!-- AI Matches -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3 style="font-size:1rem;margin:0">AI Recommended Projects</h3>
+                <a href="projects.html" class="btn btn-ghost btn-sm" style="font-size:.75rem">Browse All →</a>
+              </div>
+              <div id="matches" class="grid grid-2" style="gap:.75rem">
+                <div class="skeleton" style="height:100px"></div>
+              </div>
+            </article>
+
+            <!-- Leaderboard -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 style="font-size:1rem;margin-bottom:.75rem">Campus Leaderboard</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>#</th><th>Name</th><th>Level</th><th>XP</th><th>Rating</th></tr></thead>
+                  <tbody id="lb-body"><tr><td colspan="5" style="text-align:center">Loading...</td></tr></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+          <!-- Right Column -->
+          <div style="display:flex;flex-direction:column;gap:1.25rem">
+            <!-- Badges -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 style="font-size:.95rem;margin-bottom:.75rem">Earned Badges</h3>
+              <div id="badges" style="display:flex;flex-wrap:wrap;gap:.4rem">
+                <span class="badge-pill badge-off">🔒 Verified</span>
+                <span class="badge-pill badge-off">🔒 Top Earner</span>
+              </div>
+            </article>
+
+            <!-- Bookmarked Jobs -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 style="font-size:.95rem;margin-bottom:.75rem">📌 Saved Bookmarks</h3>
+              <div id="bookmarks-list">
+                <div class="skeleton" style="height:50px"></div>
+              </div>
+            </article>
+
+            <!-- AI Pathways -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 style="font-size:.95rem;margin-bottom:.75rem">🤖 AI Career Pathways</h3>
+              <div id="ai-pathway">
+                <div class="skeleton" style="height:60px"></div>
+              </div>
+            </article>
+
+            <!-- Quick Nav -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 style="font-size:.95rem;margin-bottom:.65rem">Quick Actions</h3>
+              <a href="career.html" class="ql"><span class="ql-icon">🤖</span><span class="ql-title">Career & AI Hub</span></a>
+              <a href="workspace.html" class="ql"><span class="ql-icon">🖥️</span><span class="ql-title">Workspace</span></a>
+              <a href="projects.html" class="ql"><span class="ql-icon">💼</span><span class="ql-title">Browse Projects</span></a>
+              <a href="portfolio.html" class="ql"><span class="ql-icon">🎨</span><span class="ql-title">Portfolio</span></a>
+              <a href="earnings.html" class="ql"><span class="ql-icon">💰</span><span class="ql-title">Earnings</span></a>
+            </article>
+          </div>
+        </div>
+      `;
+
+      function drawEarningsChart(history) {
+        const chartPoints = [
+          { x: 30, y: 130 },
+          { x: 90, y: 105 },
+          { x: 150, y: 110 },
+          { x: 210, y: 70 },
+          { x: 270, y: 80 },
+          { x: 330, y: 40 }
+        ];
+
+        const earns = (history || []).filter(t => t.type === 'escrow_release' || t.type === 'earnings' || t.type === 'deposit');
+        if (earns.length > 0) {
+          let cum = 0;
+          const points = earns.slice(-6).map((s, idx) => {
+            cum += parseFloat(s.amount);
+            return { val: cum, date: new Date(s.created_at || Date.now()).toLocaleDateString(undefined, {month:'short', day:'numeric'}) };
+          });
+          const maxVal = Math.max(...points.map(p => p.val), 100);
+          const minVal = 0;
+          const range = maxVal - minVal || 1;
+          
+          let xCoords = [30, 95, 160, 225, 290, 355];
+          chartPoints.length = 0;
+          points.forEach((p, idx) => {
+            const y = 130 - ((p.val - minVal) / range) * 100;
+            chartPoints.push({ x: xCoords[idx] || 30, y: y, label: p.date, val: p.val });
+          });
+        } else {
+          // Placeholder aesthetic curve
+          chartPoints[0].label = "Jan"; chartPoints[0].val = 20;
+          chartPoints[1].label = "Feb"; chartPoints[1].val = 80;
+          chartPoints[2].label = "Mar"; chartPoints[2].val = 50;
+          chartPoints[3].label = "Apr"; chartPoints[3].val = 150;
+          chartPoints[4].label = "May"; chartPoints[4].val = 110;
+          chartPoints[5].label = "Jun"; chartPoints[5].val = 280;
+        }
+
+        const pathD = chartPoints.reduce((acc, p, idx) => {
+          if (idx === 0) return `M ${p.x} ${p.y}`;
+          const prev = chartPoints[idx - 1];
+          const cpX1 = prev.x + (p.x - prev.x) / 2;
+          const cpY1 = prev.y;
+          const cpX2 = prev.x + (p.x - prev.x) / 2;
+          const cpY2 = p.y;
+          return `${acc} C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p.x} ${p.y}`;
+        }, "");
+
+        const fillD = `${pathD} L ${chartPoints[chartPoints.length - 1].x} 140 L ${chartPoints[0].x} 140 Z`;
+
+        const circles = chartPoints.map(p => `
+          <g class="chart-point-group" style="cursor:pointer">
+            <circle cx="${p.x}" cy="${p.y}" r="5" fill="var(--accent)" stroke="var(--bg-secondary)" stroke-width="2" />
+            <circle cx="${p.x}" cy="${p.y}" r="12" fill="var(--accent)" opacity="0" class="hover-trigger" />
+            <title>${p.label}: ${p.val.toFixed(0)} Cr Earned</title>
+          </g>
+        `).join('');
+
+        const labels = chartPoints.map(p => `
+          <text x="${p.x}" y="155" text-anchor="middle" fill="var(--text-secondary)" font-size="10" font-family="var(--font-sans)">${p.label || ''}</text>
+        `).join('');
+
+        document.getElementById('earnings-chart-svg').innerHTML = `
+          <!-- Grid Lines -->
+          <line x1="30" y1="30" x2="360" y2="30" class="chart-grid" />
+          <line x1="30" y1="80" x2="360" y2="80" class="chart-grid" />
+          <line x1="30" y1="130" x2="360" y2="130" class="chart-grid" />
+          
+          <!-- Gradient Area -->
+          <path d="${fillD}" fill="url(#chart-grad)" opacity="0.15" />
+          
+          <!-- Core Trend Line -->
+          <path d="${pathD}" class="chart-path" />
+          
+          <!-- Data Points -->
+          ${circles}
+          
+          <!-- Labels -->
+          ${labels}
+        `;
+      }
+
+      Promise.all([
+        API.get('/auth/me'),
+        API.get('/ai/project-matches').catch(() => []),
+        API.get('/users/leaderboard').catch(() => []),
+        API.get('/payments/history').catch(() => []),
+        API.get('/projects/saved').catch(() => [])
+      ]).then(([user, matches, lb, history, savedList]) => {
+
+        const p = user.profile || {};
+        const xp = p.xp || 0;
+        const level = p.level || 'Rookie';
+        const rating = p.rating_avg || 0;
+
+        // Stats
+        document.getElementById('st').innerHTML = `
+          <article class="glass stat-card">
+            <span class="label">💰 Wallet</span>
+            <span class="value" style="color:var(--success)">${user.wallet_balance.toFixed(0)} Cr</span>
+          </article>
+          <article class="glass stat-card">
+            <span class="label">⭐ Rating</span>
+            <span class="value">${rating > 0 ? rating.toFixed(1) : '—'}</span>
+          </article>
+          <article class="glass stat-card">
+            <span class="label">🤖 AI Matches</span>
+            <span class="value">${matches.length}</span>
+          </article>
+          <article class="glass stat-card">
+            <span class="label">⚡ Level</span>
+            <span class="value" style="color:var(--accent)">${level}</span>
+          </article>
+        `;
+
+        // XP Bar
+        const maxXp = xp >= 2000 ? 3000 : xp >= 1000 ? 2000 : xp >= 500 ? 1000 : 500;
+        const next = xp >= 2000 ? 'Legend' : xp >= 1000 ? 'Expert' : xp >= 500 ? 'Pro' : 'Skilled';
+        const pct = Math.min((xp / maxXp) * 100, 100);
+        document.getElementById('xp-content').innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <span style="font-weight:800;font-size:1.05rem;color:var(--accent)">${xp} XP</span>
+            <span style="font-size:.78rem;color:var(--text-secondary)">Next: ${next} (${maxXp})</span>
+          </div>
+          <div class="xp-outer"><div class="xp-inner" style="width:${pct}%"></div></div>
+        `;
+
+        // AI Matches
+        const mc = document.getElementById('matches');
+        if (!matches.length) {
+          mc.innerHTML = '<p style="color:var(--text-secondary);grid-column:1/-1;font-size:.88rem">Add skills to your profile for AI recommendations.</p>';
+        } else {
+          mc.innerHTML = matches.slice(0, 4).map(x => `
+            <article class="glass card" style="padding:1rem">
+              <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.4rem">
+                <h4 style="font-size:.88rem;margin:0;line-height:1.3">${x.project.title}</h4>
+                <span class="badge" style="font-size:.68rem;flex-shrink:0;margin-left:.5rem">${x.match_score}%</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--border)">
+                <span style="font-weight:700;font-size:.85rem;color:var(--success)">${formatMoney(x.project.budget)}</span>
+                <a href="projects.html" class="btn btn-ghost btn-sm" style="font-size:.72rem;padding:.3rem .6rem">Apply</a>
+              </div>
+            </article>
+          `).join('');
+        }
+
+        // Leaderboard
+        const lbEl = document.getElementById('lb-body');
+        if (!lb.length) {
+          lbEl.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary)">No data yet</td></tr>';
+        } else {
+          lbEl.innerHTML = lb.slice(0, 8).map((f, i) => {
+            const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}`;
+            return `<tr>
+              <td style="font-weight:700">${rank}</td>
+              <td>${f.full_name||'Student'}</td>
+              <td><span class="badge" style="font-size:.7rem">${f.level||'Rookie'}</span></td>
+              <td style="font-weight:600">${f.xp||0}</td>
+              <td>⭐ ${(f.rating_avg||0).toFixed(1)}</td>
+            </tr>`;
+          }).join('');
+        }
+
+        // Badges
+        const isV = p.is_verified || false;
+        const topE = (p.total_earnings || 0) >= 100;
+        const star = rating >= 4.5;
+        document.getElementById('badges').innerHTML = `
+          <span class="badge-pill ${star ? 'badge-on' : 'badge-off'}">${star ? '⭐' : '🔒'} Rising Star</span>
+          <span class="badge-pill ${topE ? 'badge-on' : 'badge-off'}">${topE ? '💰' : '🔒'} Top Earner</span>
+          <span class="badge-pill ${isV ? 'badge-on' : 'badge-off'}">${isV ? '✅' : '🔒'} Verified Pro</span>
+        `;
+
+        // Bookmarks
+        const bkEl = document.getElementById('bookmarks-list');
+        if (!savedList || savedList.length === 0) {
+          bkEl.innerHTML = '<span style="font-size:.78rem; color:var(--text-secondary)">No bookmarked jobs yet.</span>';
+        } else {
+          bkEl.innerHTML = savedList.slice(0, 3).map(p => `
+            <a href="projects.html" class="bookmark-card">
+              <span class="bookmark-title">${p.title}</span>
+              <div class="bookmark-meta">
+                <span style="color:var(--success); font-weight:700">${p.budget} Cr</span>
+                <span>${p.duration || '2-4 weeks'}</span>
+              </div>
+            </a>
+          `).join('');
+        }
+
+        // AI Career Pathways matching verified level
+        const pathwayEl = document.getElementById('ai-pathway');
+        pathwayEl.innerHTML = `
+          <div class="pathway-item">
+            <div class="pathway-title">🚀 Campus Tech Lead</div>
+            <div style="font-size:.72rem; color:var(--text-secondary)">XP: ${xp}/1000. Recommended skill: React, Flask APIs, SQLite logic.</div>
+          </div>
+          <div class="pathway-item">
+            <div class="pathway-title">🤖 AI Automation Master</div>
+            <div style="font-size:.72rem; color:var(--text-secondary)">Verified Level: ${level}. Recommends: Python Developer, AI Prompt Eng.</div>
+          </div>
+        `;
+
+        drawEarningsChart(history);
+
+      }).catch(err => showToast('Error: ' + err.message, 'error'));
+    });
+  </script>
+</body>
+</html>

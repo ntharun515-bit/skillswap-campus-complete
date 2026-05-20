@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Skill Quiz Verification | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <style>
+    .quiz-container {
+      max-width: 700px;
+      margin: 1.5rem auto 0;
+    }
+    .question-box {
+      margin-top: 1.5rem;
+    }
+    .option-btn {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 1rem 1.25rem;
+      margin-bottom: 0.75rem;
+      border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      cursor: pointer;
+      font-size: 0.95rem;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .option-btn:hover {
+      background: rgba(255,255,255,0.06);
+      border-color: var(--accent);
+    }
+    .option-btn.selected {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    .progress-bar-bg {
+      background: var(--border);
+      height: 6px;
+      border-radius: 99px;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+    .progress-bar-fill {
+      background: var(--gradient-hero);
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .timer-badge {
+      padding: 0.4rem 0.85rem;
+      border-radius: var(--radius-sm);
+      font-weight: 700;
+      font-family: var(--font-heading);
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--danger);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('student', 'verification', 'Skill Verification Quiz', function(el) {
+      // Core Quiz Databank
+      const quizzes = {
+        python: {
+          title: "Python & Flask Development",
+          questions: [
+            { q: "What is Flask in the Python ecosystem?", options: ["A micro web framework", "A database engine", "A machine learning library", "A compiler"], answer: 0 },
+            { q: "Which HTTP method is typically used to create a new database resource?", options: ["GET", "POST", "DELETE", "PUT"], answer: 1 },
+            { q: "What is SQLAlchemy?", options: ["An Object-Relational Mapper (ORM)", "A style framework", "An operating system", "A cryptography key"], answer: 0 },
+            { q: "What does SQL stand for?", options: ["Structured Query Language", "Symmetric Queue Line", "Simple Query Lock", "System Quantity Logic"], answer: 0 },
+            { q: "Which HTTP status code represents successful resource creation?", options: ["200 OK", "201 Created", "400 Bad Request", "500 Server Error"], answer: 1 }
+          ]
+        },
+        javascript: {
+          title: "Javascript & Web Frontend",
+          questions: [
+            { q: "What does DOM stand for?", options: ["Data Object Mode", "Digital Operations Markup", "Document Object Model", "Dynamic Output Menu"], answer: 2 },
+            { q: "Which keyword declares a block-scoped local variable in Javascript?", options: ["var", "let", "global", "define"], answer: 1 },
+            { q: "Which method is used to attach an event handler to a DOM element?", options: ["bindEvent()", "addEventListener()", "connect()", "watch()"], answer: 1 },
+            { q: "What is the primary purpose of JSON in web APIs?", options: ["Styling text lines", "Data serialization and transfer", "Encrypting database passwords", "Compiling local scripts"], answer: 1 },
+            { q: "What does CSS stand for?", options: ["Computer Style Scripts", "Cascading Style Sheets", "Canvas System Sheets", "Controlled Style Setup"], answer: 1 }
+          ]
+        },
+        design: {
+          title: "Graphic Design & User Experience (UX)",
+          questions: [
+            { q: "What does UI stand for in digital layout design?", options: ["User Interface", "Universal Input", "Utility Indicator", "Unique Identifier"], answer: 0 },
+            { q: "What does high contrast primarily help achieve in a webpage layout?", options: ["Vibrant screen colors", "Visual hierarchy and scannability", "Faster loading timers", "Smaller image sizes"], answer: 1 },
+            { q: "What is typography?", options: ["The art of arranging type", "Creating dynamic vector logo images", "Encoding visual canvas graphics", "Performing wireframe usability tests"], answer: 0 },
+            { q: "What does RGB stand for in color selection tokens?", options: ["Red, Gold, Black", "Range, Grid, Blend", "Red, Green, Blue", "Ratio, Gradient, Border"], answer: 2 },
+            { q: "What is the main goal of user-centered design?", options: ["Reducing code build sizes", "Usability and user satisfaction", "Increasing dynamic web assets", "Creating complex navigations"], answer: 1 }
+          ]
+        }
+      };
+
+      let activeQuiz = null;
+      let currentIdx = 0;
+      let score = 0;
+      let timer = null;
+      let secondsLeft = 60;
+
+      // Render Setup Screen
+      function showSetup() {
+        el.innerHTML = `
+          <div class="quiz-container">
+            <article class="glass card">
+              <h2>🏅 Timed Skill Verification Portal</h2>
+              <p style="color:var(--text-secondary);margin-top:0.5rem">
+                Verify your expertise, build client trust, and unlock your <b>Verified Pro</b> dashboard badge! 
+                Scoring <b>80% or higher</b> (at least 4 out of 5 correct answers) automatically verifies your profile.
+              </p>
+              
+              <div style="margin-top:2rem">
+                <h3>Select Your Verification Track:</h3>
+                <div style="display:flex;flex-direction:column;gap:1rem;margin-top:1rem">
+                  <button class="btn btn-ghost" id="btn-py" style="justify-content:start;padding:1.25rem">
+                    🐍 Python & Flask Backend Developer
+                  </button>
+                  <button class="btn btn-ghost" id="btn-js" style="justify-content:start;padding:1.25rem">
+                    🌐 Javascript & Web Frontend Developer
+                  </button>
+                  <button class="btn btn-ghost" id="btn-ds" style="justify-content:start;padding:1.25rem">
+                    🎨 Graphic Design & UX Specialist
+                  </button>
+                </div>
+              </div>
+            </article>
+          </div>
+        `;
+
+        document.getElementById('btn-py').onclick = () => startExam('python');
+        document.getElementById('btn-js').onclick = () => startExam('javascript');
+        document.getElementById('btn-ds').onclick = () => startExam('design');
+      }
+
+      // Start Timed Exam
+      function startExam(track) {
+        activeQuiz = quizzes[track];
+        currentIdx = 0;
+        score = 0;
+        secondsLeft = 60;
+
+        renderQuestion();
+        
+        timer = setInterval(() => {
+          secondsLeft--;
+          const tBadge = document.getElementById('timer-badge');
+          if (tBadge) {
+            tBadge.innerHTML = `⏱️ ${secondsLeft}s`;
+          }
+          if (secondsLeft <= 0) {
+            clearInterval(timer);
+            submitResults();
+          }
+        }, 1000);
+      }
+
+      // Render Active Question
+      function renderQuestion() {
+        const item = activeQuiz.questions[currentIdx];
+        const progress = Math.round(((currentIdx) / activeQuiz.questions.length) * 100);
+
+        el.innerHTML = `
+          <div class="quiz-container">
+            <article class="glass card">
+              <div style="display:flex;justify-content:between;align-items:center">
+                <span class="badge">${activeQuiz.title}</span>
+                <span class="timer-badge" id="timer-badge" style="margin-left:auto">⏱️ ${secondsLeft}s</span>
+              </div>
+              
+              <div class="progress-bar-bg">
+                <div class="progress-bar-fill" style="width:${progress}%"></div>
+              </div>
+              <p style="font-size:0.85rem;color:var(--text-secondary);margin-top:0.25rem;text-align:right">Question ${currentIdx + 1} of ${activeQuiz.questions.length}</p>
+
+              <div class="question-box">
+                <h3 style="font-size:1.35rem;line-height:1.4;margin-bottom:1.5rem">${item.q}</h3>
+                <div style="display:flex;flex-direction:column;gap:0.75rem">
+                  ${item.options.map((opt, index) => `
+                    <button class="option-btn" data-index="${index}">${opt}</button>
+                  `).join('')}
+                </div>
+              </div>
+            </article>
+          </div>
+        `;
+
+        el.querySelectorAll('.option-btn').forEach(btn => {
+          btn.onclick = () => {
+            const chosen = +btn.dataset.index;
+            if (chosen === item.answer) {
+              score += 20;
+            }
+            nextQuestion();
+          };
+        });
+      }
+
+      // Progress questions
+      function nextQuestion() {
+        currentIdx++;
+        if (currentIdx < activeQuiz.questions.length) {
+          renderQuestion();
+        } else {
+          clearInterval(timer);
+          submitResults();
+        }
+      }
+
+      // Submit results to server
+      async function submitResults() {
+        el.innerHTML = `
+          <div class="quiz-container">
+            <article class="glass card" style="text-align:center;padding:3rem">
+              <div class="skeleton" style="height:40px;width:80%;margin:0 auto 1.5rem"></div>
+              <h3>Submitting your quiz results...</h3>
+            </article>
+          </div>
+        `;
+
+        try {
+          const res = await API.post('/users/profile/verify', {
+            score: score,
+            topic: activeQuiz.title
+          });
+
+          if (res.verified) {
+            el.innerHTML = `
+              <div class="quiz-container">
+                <article class="glass card" style="text-align:center;padding:3rem">
+                  <span style="font-size:4rem">🏅</span>
+                  <h2 style="color:var(--success);margin-top:1rem">Congratulations!</h2>
+                  <p style="font-size:1.1rem;margin-top:1rem;color:var(--text-primary)">
+                    You scored <b>${score}%</b> and passed!
+                  </p>
+                  <p style="color:var(--text-secondary);margin-top:0.5rem">
+                    Your profile has been updated to <b>Verified Pro</b> status. The verified badge is now live on your profile and dashboard!
+                  </p>
+                  <button class="btn btn-primary" id="btn-back" style="margin-top:2rem">Back to Dashboard</button>
+                </article>
+              </div>
+            `;
+          } else {
+            el.innerHTML = `
+              <div class="quiz-container">
+                <article class="glass card" style="text-align:center;padding:3rem">
+                  <span style="font-size:4rem">❌</span>
+                  <h2 style="color:var(--danger);margin-top:1rem">Try Again!</h2>
+                  <p style="font-size:1.1rem;margin-top:1rem;color:var(--text-primary)">
+                    You scored <b>${score}%</b>.
+                  </p>
+                  <p style="color:var(--text-secondary);margin-top:0.5rem">
+                    You need to score at least <b>80%</b> (4/5 correct answers) to pass and automatically verify this skill track.
+                  </p>
+                  <div style="display:flex;gap:1rem;justify-content:center;margin-top:2rem">
+                    <button class="btn btn-ghost" id="btn-retry">Retry Quiz</button>
+                    <button class="btn btn-primary" id="btn-back">Dashboard</button>
+                  </div>
+                </article>
+              </div>
+            `;
+            document.getElementById('btn-retry').onclick = () => showSetup();
+          }
+
+          document.getElementById('btn-back').onclick = () => {
+            window.location.href = "dashboard.html";
+          };
+
+        } catch (err) {
+          showToast("Failed to verify quiz results: " + err.message, "error");
+          showSetup();
+        }
+      }
+
+      // Init setup screen
+      showSetup();
+    });
+  </script>
+</body>
+</html>

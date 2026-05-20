@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('admin', 'analytics', 'Analytics', function(el) {
+      
+  el.innerHTML='<div class="stats-grid" id="aa"></div>';
+  API.get('/admin/dashboard').then(s=>{aa.innerHTML=Object.keys(s).map(k=>'<article class="glass stat-card"><span class="label">'+k+'</span><span class="value">'+s[k]+'</span></article>').join('');});
+
+    });
+  </script>
+</body>
+</html>

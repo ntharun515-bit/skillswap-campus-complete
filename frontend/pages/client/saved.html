@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saved Talent | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('client', 'saved', 'Saved Campus Talent', function(el) {
+      el.innerHTML = `
+        <div style="max-width:1000px;margin:0 auto">
+          <p style="color:var(--text-secondary);font-size:0.9rem;margin-bottom:2rem">Shortlist and manage your favorite campus freelancers. Message them or invite them directly to your active campaigns.</p>
+          
+          <div id="sl" class="grid grid-2">
+            <div class="glass card skeleton" style="height:140px"></div>
+            <div class="glass card skeleton" style="height:140px"></div>
+          </div>
+        </div>
+      `;
+
+      const listEl = document.getElementById('sl');
+
+      async function loadSavedFreelancers() {
+        try {
+          listEl.innerHTML = `
+            <div class="glass card skeleton" style="height:140px"></div>
+            <div class="glass card skeleton" style="height:140px"></div>
+          `;
+
+          const items = await API.get('/users/saved-freelancers');
+          if (items.length === 0) {
+            listEl.innerHTML = `
+              <div style="grid-column:1/-1;text-align:center;padding:5rem 2rem;" class="glass card">
+                <span style="font-size:3.5rem">👥</span>
+                <h3 style="margin-top:1.5rem">Talent List Empty</h3>
+                <p style="color:var(--text-secondary);margin-top:0.5rem">Save student freelancers from applicant listings or direct searches to review them here.</p>
+              </div>
+            `;
+            return;
+          }
+
+          listEl.innerHTML = items.map(f => {
+            const isVerified = f.is_verified || false;
+            const isAvailable = f.availability === 'available';
+            const avgRating = f.rating_avg || 0;
+            const rateText = f.hourly_rate ? `${f.hourly_rate} Cr/Hr` : 'Custom Rate';
+
+            const verifiedBadge = isVerified 
+              ? `<span class="badge" style="background:rgba(16,185,129,0.15);color:var(--success)">🛡️ Verified Pro</span>` 
+              : '';
+
+            const availBadge = isAvailable
+              ? `<span class="badge" style="background:rgba(16,185,129,0.1);color:var(--success)">🟢 Available</span>`
+              : `<span class="badge" style="background:rgba(239,68,68,0.1);color:var(--error)">🔴 Busy</span>`;
+
+            return `
+              <article class="glass card" id="freelancer-${f.user_id}" style="display:flex;flex-direction:column;justify-content:between">
+                <div>
+                  <div style="display:flex;justify-content:between;align-items:start;margin-bottom:0.5rem">
+                    <h3 style="font-size:1.15rem;font-weight:800;color:var(--text-primary);margin:0">${f.user?.full_name || 'Campus Member'}</h3>
+                    <div style="display:flex;gap:0.3rem;flex-wrap:wrap;justify-content:end">
+                      ${verifiedBadge}
+                      ${availBadge}
+                    </div>
+                  </div>
+                  
+                  <span style="font-size:0.85rem;color:var(--accent);font-weight:700;display:block;margin-bottom:0.75rem">${f.headline || 'General Freelancer'}</span>
+                  <p style="font-size:0.88rem;color:var(--text-secondary);line-height:1.45;margin-bottom:1rem">${f.bio ? f.bio.slice(0, 100) + '...' : 'No detailed bio provided.'}</p>
+                </div>
+
+                <div style="display:flex;justify-content:between;align-items:center;border-top:1px solid var(--border);padding-top:1rem;margin-top:auto">
+                  <div style="display:flex;flex-direction:column">
+                    <span style="font-size:0.72rem;color:var(--text-secondary)">Rate & Star Score:</span>
+                    <span style="font-weight:700;font-size:0.92rem;color:var(--text-primary)">
+                      💰 ${rateText} <span style="color:var(--warning);margin-left:0.5rem">★ ${avgRating.toFixed(1)}</span>
+                    </span>
+                  </div>
+                  <div style="display:flex;gap:0.5rem">
+                    <button class="btn btn-ghost btn-sm remove-btn" data-id="${f.user_id}">❌ Unsave</button>
+                    <a href="messages.html?recipient_id=${f.user_id}" class="btn btn-primary btn-sm">💬 Message</a>
+                  </div>
+                </div>
+              </article>
+            `;
+          }).join('');
+
+          // Bind DELETE events
+          listEl.querySelectorAll('.remove-btn').forEach(btn => {
+            btn.onclick = async () => {
+              const fid = btn.dataset.id;
+              try {
+                await API.delete(`/users/saved-freelancers?freelancer_id=${fid}`);
+                showToast('Freelancer removed from your saved list', 'success');
+                
+                // Animate out
+                const card = document.getElementById(`freelancer-${fid}`);
+                if (card) {
+                  card.style.opacity = '0';
+                  card.style.transform = 'scale(0.9)';
+                  card.style.transition = 'opacity 0.3s, transform 0.3s';
+                  setTimeout(loadSavedFreelancers, 300);
+                } else {
+                  loadSavedFreelancers();
+                }
+              } catch (err) {
+                showToast('Failed to unsave freelancer: ' + err.message, 'error');
+              }
+            };
+          });
+
+        } catch (err) {
+          showToast('Failed to load saved directory: ' + err.message, 'error');
+        }
+      }
+
+      loadSavedFreelancers();
+    });
+  </script>
+</body>
+</html>

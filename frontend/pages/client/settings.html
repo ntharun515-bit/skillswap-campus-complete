@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings Hub | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('client', 'settings', 'Account Settings', function(el) {
+      el.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:2rem;max-width:1100px;margin:0 auto">
+          <div>
+            <form id="sf" class="glass card" style="padding:2.5rem;display:flex;flex-direction:column;gap:1.5rem">
+              <h3 style="font-size:1.25rem;font-weight:800;letter-spacing:-0.02em;margin-bottom:0.25rem">💼 Client Profile Settings</h3>
+              <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1rem">Update your personal account credentials and university campuses.</p>
+
+              <div class="form-group">
+                <label style="font-weight:600;font-size:0.85rem">Full Name</label>
+                <input type="text" id="nm" required style="width:100%">
+              </div>
+
+              <div class="form-group">
+                <label style="font-weight:600;font-size:0.85rem">University Email</label>
+                <input type="email" id="email" required style="width:100%">
+              </div>
+
+              <div class="form-group">
+                <label style="font-weight:600;font-size:0.85rem">Campus / College</label>
+                <input type="text" id="campus" required style="width:100%">
+              </div>
+
+              <button class="btn btn-primary" type="submit" style="align-self:end;margin-top:1rem">Save Changes</button>
+            </form>
+          </div>
+
+          <div>
+            <div style="display:flex;flex-direction:column;gap:1.5rem">
+              <!-- Wallet Refill Capsule -->
+              <article class="glass card" style="padding:1.5rem">
+                <h4 style="font-size:1.1rem;font-weight:800;display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem">
+                  <span>💳</span> Credit Wallet Hub
+                </h4>
+                <p style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:1rem;line-height:1.4">
+                  Need more credits to launch large projects and secure active escrow milestones? Add test credits immediately.
+                </p>
+
+                <!-- Current Balance View -->
+                <div style="padding:1rem;border-radius:var(--radius-md);background:rgba(255,255,255,0.02);border:1px solid var(--border);text-align:center;margin-bottom:1.5rem">
+                  <span style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Current Assets</span>
+                  <h3 id="wallet-total-val" style="font-size:1.75rem;color:var(--success);font-weight:800;margin-top:0.25rem">0.00 Cr</h3>
+                </div>
+
+                <!-- Fast Topup Sliders -->
+                <div class="form-group" style="margin-bottom:1rem">
+                  <label style="font-weight:600;font-size:0.8rem">Quick Top-Up (Credits)</label>
+                  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.4rem;margin-top:0.4rem">
+                    <button type="button" class="btn btn-ghost btn-sm quick-topup-btn" data-val="250">+250</button>
+                    <button type="button" class="btn btn-ghost btn-sm quick-topup-btn" data-val="500">+500</button>
+                    <button type="button" class="btn btn-ghost btn-sm quick-topup-btn" data-val="1000">+1000</button>
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:1.5rem">
+                  <input type="number" id="custom-deposit" placeholder="Enter custom amount..." min="10" style="width:100%;font-size:0.85rem">
+                </div>
+
+                <button class="btn btn-primary" id="btn-topup" style="width:100%">💰 Add Credits</button>
+              </article>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const nm = document.getElementById('nm');
+      const email = document.getElementById('email');
+      const campus = document.getElementById('campus');
+      const sf = document.getElementById('sf');
+      
+      const walletVal = document.getElementById('wallet-total-val');
+      const customDepositInput = document.getElementById('custom-deposit');
+      const topupBtn = document.getElementById('btn-topup');
+
+      async function syncProfileData() {
+        try {
+          const user = await API.get('/auth/me');
+          nm.value = user.full_name || '';
+          email.value = user.email || '';
+          campus.value = user.campus || '';
+          
+          walletVal.textContent = user.wallet_balance.toFixed(2) + ' Cr';
+          
+          // Sync sidebar values as well
+          const sideWallet = document.getElementById('sidebar-wallet-value');
+          if (sideWallet) sideWallet.textContent = user.wallet_balance.toFixed(2) + ' Cr';
+
+        } catch (err) {
+          showToast('Failed to sync settings: ' + err.message, 'error');
+        }
+      }
+
+      // Handle settings form submit
+      sf.onsubmit = async e => {
+        e.preventDefault();
+        try {
+          await API.put('/users/settings', {
+            full_name: nm.value.trim(),
+            email: email.value.trim(),
+            campus: campus.value.trim()
+          });
+          
+          showToast('Profile settings updated successfully!', 'success');
+          syncProfileData();
+        } catch (err) {
+          showToast('Failed to save settings: ' + err.message, 'error');
+        }
+      };
+
+      // Handle Quick-Topup buttons
+      document.querySelectorAll('.quick-topup-btn').forEach(btn => {
+        btn.onclick = () => {
+          customDepositInput.value = btn.dataset.val;
+        };
+      });
+
+      // Handle Deposit click
+      topupBtn.onclick = async () => {
+        const val = +customDepositInput.value;
+        if (!val || val <= 0) {
+          showToast('Please specify a positive top-up credit amount.', 'error');
+          return;
+        }
+
+        topupBtn.disabled = true;
+        topupBtn.innerHTML = `<span>⏳</span> Processing...`;
+
+        try {
+          await API.put('/users/settings', { deposit_amount: val });
+          showToast(`Success! Deposited ${val.toFixed(2)} Credits into your wallet.`, 'success');
+          customDepositInput.value = '';
+          syncProfileData();
+        } catch (err) {
+          showToast('Deposit failed: ' + err.message, 'error');
+        } finally {
+          topupBtn.disabled = false;
+          topupBtn.innerHTML = `💰 Add Credits`;
+        }
+      };
+
+      syncProfileData();
+    });
+  </script>
+</body>
+</html>

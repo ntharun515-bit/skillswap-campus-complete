@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Accounts | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <style>
+    .mod-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius-sm);
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('admin', 'users', 'Account Operations', function(el) {
+      el.innerHTML = `
+        <div class="stats-grid" id="accounts-stats" style="margin-bottom:2rem">
+          <div class="glass card skeleton" style="height:100px"></div>
+          <div class="glass card skeleton" style="height:100px"></div>
+          <div class="glass card skeleton" style="height:100px"></div>
+          <div class="glass card skeleton" style="height:100px"></div>
+        </div>
+
+        <article class="glass card">
+          <h3 style="font-size:1.25rem;margin-bottom:0.25rem">👤 Campus Accounts Directory</h3>
+          <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.5rem">Audit university profiles, check wallet balances, feature freelancers, or toggle account access restrictions.</p>
+          
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Full Name</th>
+                  <th>Contact Info</th>
+                  <th>Campus</th>
+                  <th>Role</th>
+                  <th>Balance</th>
+                  <th>Mod Operations</th>
+                </tr>
+              </thead>
+              <tbody id="ut">
+                <tr><td colspan="6" style="text-align:center">Loading campus accounts...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      `;
+
+      const statsEl = document.getElementById('accounts-stats');
+      const tableBody = document.getElementById('ut');
+
+      async function loadAccountsWorkspace() {
+        try {
+          const users = await API.get('/admin/users');
+
+          // Calculate counts
+          const totalCount = users.length;
+          const students = users.filter(u => u.role === 'student').length;
+          const clients = users.filter(u => u.role === 'client').length;
+          const banned = users.filter(u => u.is_banned).length;
+
+          statsEl.innerHTML = `
+            <article class="glass stat-card">
+              <span class="label">👥 Total Members</span>
+              <span class="value">${totalCount}</span>
+            </article>
+            <article class="glass stat-card">
+              <span class="label">🎓 Student Freelancers</span>
+              <span class="value" style="color:var(--accent)">${students}</span>
+            </article>
+            <article class="glass stat-card">
+              <span class="label">💼 Campus Clients</span>
+              <span class="value">${clients}</span>
+            </article>
+            <article class="glass stat-card">
+              <span class="label">🚨 Banned Accounts</span>
+              <span class="value" style="color:var(--error)">${banned}</span>
+            </article>
+          `;
+
+          if (users.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-secondary)">No accounts registered on the server.</td></tr>`;
+            return;
+          }
+
+          tableBody.innerHTML = users.map(u => {
+            const isStudent = u.role === 'student';
+            const isClient = u.role === 'client';
+            const isBanned = u.is_banned || false;
+            
+            // Choose Role Badge
+            let roleBadge = '';
+            if (isStudent) {
+              roleBadge = `<span class="mod-badge" style="background:rgba(13, 148, 136, 0.15);color:var(--accent)">Student</span>`;
+            } else if (isClient) {
+              roleBadge = `<span class="mod-badge" style="background:rgba(16,185,129,0.15);color:var(--success)">Client</span>`;
+            } else {
+              roleBadge = `<span class="mod-badge" style="background:rgba(255,255,255,0.05);color:var(--text-secondary)">Admin</span>`;
+            }
+
+            // Featured toggle button for student freelancers
+            let featureAction = '';
+            if (isStudent) {
+              // Note: we can visually render if they are featured
+              const isFeatured = u.freelancer_profile?.is_featured || false;
+              const starColor = isFeatured ? 'var(--warning)' : 'var(--text-secondary)';
+              const starText = isFeatured ? '★ Featured' : '☆ Feature';
+              featureAction = `<button class="btn btn-ghost btn-sm feature-btn" data-id="${u.id}" style="color:${starColor}">${starText}</button>`;
+            }
+
+            // Ban/Unban toggle
+            const banAction = isBanned 
+              ? `<button class="btn btn-ghost btn-sm ban-btn" data-id="${u.id}" data-banned="false" style="color:var(--success);border-color:rgba(16,185,129,0.1)">🟢 Unban</button>`
+              : `<button class="btn btn-ghost btn-sm ban-btn" data-id="${u.id}" data-banned="true" style="color:var(--error);border-color:rgba(239,68,68,0.1)">🔴 Ban Account</button>`;
+
+            return `
+              <tr id="row-${u.id}">
+                <td><strong>${u.full_name}</strong></td>
+                <td>
+                  <span style="font-size:0.85rem;color:var(--text-primary);display:block">${u.email}</span>
+                </td>
+                <td><span style="font-size:0.85rem">${u.campus || 'Main Campus'}</span></td>
+                <td>${roleBadge}</td>
+                <td><strong style="color:var(--success)">${formatMoney(u.wallet_balance || 0)}</strong></td>
+                <td>
+                  <div style="display:flex;gap:0.4rem">
+                    ${banAction}
+                    ${featureAction}
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('');
+
+          // Bind Ban Action Buttons
+          tableBody.querySelectorAll('.ban-btn').forEach(btn => {
+            btn.onclick = async () => {
+              const uid = btn.dataset.id;
+              const nextBanState = btn.dataset.banned === 'true';
+              const alertMsg = nextBanState 
+                ? "Are you sure you want to ban/suspend this account? They will lose access to login and direct message channels."
+                : "Are you sure you want to restore access and unban this account?";
+              
+              if (confirm(alertMsg)) {
+                try {
+                  await API.put(`/admin/users/${uid}`, { is_banned: nextBanState });
+                  showToast(nextBanState ? 'Account suspended successfully!' : 'Account access restored!', 'success');
+                  loadAccountsWorkspace();
+                } catch (err) {
+                  showToast('Operation failed: ' + err.message, 'error');
+                }
+              }
+            };
+          });
+
+          // Bind Feature Action Buttons
+          tableBody.querySelectorAll('.feature-btn').forEach(btn => {
+            btn.onclick = async () => {
+              const uid = btn.dataset.id;
+              try {
+                const res = await API.put(`/admin/featured/freelancer/${uid}`, {});
+                showToast(res.is_featured ? 'Student featured on platform homepage!' : 'Student removed from featured list.', 'success');
+                loadAccountsWorkspace();
+              } catch (err) {
+                showToast('Failed to toggle featured status: ' + err.message, 'error');
+              }
+            };
+          });
+
+        } catch (err) {
+          showToast('Failed to load accounts ledger: ' + err.message, 'error');
+        }
+      }
+
+      loadAccountsWorkspace();
+    });
+  </script>
+</body>
+</html>

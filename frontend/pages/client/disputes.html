@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Disputes Desk | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <style>
+    .disputes-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1rem;
+    }
+    @media (max-width: 900px) {
+      .disputes-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .dispute-item {
+      padding: 1.25rem;
+      border-radius: var(--radius-lg);
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      margin-bottom: 1rem;
+      transition: all 0.2s ease;
+    }
+    .dispute-item:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('client', 'disputes', 'Disputes Desk', function(el) {
+      el.innerHTML = `
+        <div class="disputes-grid">
+          
+          <!-- LEFT PANELS: ACTIVE & RESOLVED DISPUTES -->
+          <div>
+            <article class="glass card">
+              <h2>⚠️ Active Disputes Logs</h2>
+              <p style="font-size:0.85rem;color:var(--text-secondary);margin-top:0.25rem">Below are the platform mediation cases currently open or settled.</p>
+              
+              <div style="margin-top:1.25rem" id="disputes-list-container">
+                <p style="color:var(--text-secondary);font-size:0.85rem">Loading disputes...</p>
+              </div>
+            </article>
+          </div>
+
+          <!-- RIGHT PANEL: DISPUTE REPORTING FORM -->
+          <div>
+            <article class="glass card">
+              <h2>⚖️ Lodge Mediation Case</h2>
+              <p style="font-size:0.85rem;color:var(--text-secondary);margin-top:0.25rem">File an administrative mediation case for review. Locks Escrow instantly.</p>
+              
+              <div style="margin-top:1.25rem;display:flex;flex-direction:column;gap:0.75rem">
+                <div>
+                  <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.25rem">Target Contract Project</label>
+                  <select id="dispute-project-select" class="form-control" style="width:100%"></select>
+                </div>
+
+                <div>
+                  <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.25rem">Case Title</label>
+                  <input type="text" id="dispute-title-field" class="form-control" placeholder="e.g. Incomplete specifications delivered" style="width:100%">
+                </div>
+
+                <div>
+                  <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.25rem">Detailed Reason / Claims</label>
+                  <textarea id="dispute-reason-field" class="form-control" placeholder="Explain the context and why you require refunds or mediation..." style="width:100%;height:100px"></textarea>
+                </div>
+
+                <div>
+                  <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.25rem">Evidence attachments (Workspace files, etc)</label>
+                  <input type="text" id="dispute-evidence-field" class="form-control" placeholder="References link / file names" style="width:100%">
+                </div>
+
+                <button class="btn btn-primary" onclick="submitMediationDispute()" style="margin-top:0.5rem;width:100%">Lodge Mediation Dispute</button>
+              </div>
+            </article>
+          </div>
+
+        </div>
+      `;
+
+      // Load disputes list and client contract selections
+      loadDisputesData();
+    });
+
+    function loadDisputesData() {
+      Promise.all([
+        API.get('/api/disputes'),
+        API.get('/projects/my')
+      ]).then(([disputes, projects]) => {
+        
+        // 1. Render disputes list
+        const container = document.getElementById('disputes-list-container');
+        if (!disputes || disputes.length === 0) {
+          container.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem">No platform dispute records found.</p>';
+        } else {
+          container.innerHTML = disputes.map(d => {
+            const isResolved = d.status === 'resolved';
+            return `
+              <div class="dispute-item">
+                <div style="display:flex;justify-content:between;align-items:center">
+                  <span class="badge" style="background:${isResolved ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'};color:${isResolved ? 'var(--success)' : 'var(--error)'}">
+                    ${d.status.toUpperCase()}
+                  </span>
+                  <span style="font-size:0.75rem;color:var(--text-secondary)">${formatDate(d.created_at)}</span>
+                </div>
+                <h4 style="font-size:1rem;margin:0.5rem 0 0.25rem 0">${d.title}</h4>
+                <p style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.5rem">${d.reason}</p>
+                <div style="font-size:0.75rem;color:var(--accent)">Evidence: ${d.evidence_url || 'N/A'}</div>
+              </div>
+            `;
+          }).join('');
+        }
+
+        // 2. Render Project selections (Only active campaigns)
+        const select = document.getElementById('dispute-project-select');
+        const activeCampaigns = projects.filter(p => p.status !== 'open' && p.status !== 'draft');
+        
+        if (activeCampaigns.length === 0) {
+          select.innerHTML = '<option value="">-- No Active Contracts --</option>';
+          return;
+        }
+
+        select.innerHTML = '<option value="">-- Choose Contract Project --</option>' + activeCampaigns.map(p => `
+          <option value="${p.id}">${p.title}</option>
+        `).join('');
+
+      }).catch(err => {
+        showToast('Sync failure: ' + err.message, 'error');
+      });
+    }
+
+    function submitMediationDispute() {
+      const pid = document.getElementById('dispute-project-select').value;
+      const title = document.getElementById('dispute-title-field').value;
+      const reason = document.getElementById('dispute-reason-field').value;
+      const evidence = document.getElementById('dispute-evidence-field').value;
+
+      if (!pid || !title || !reason) {
+        showToast('Project, title, and detailed reason required!', 'warning');
+        return;
+      }
+
+      API.post('/api/disputes', {
+        project_id: pid,
+        title: title,
+        reason: reason,
+        evidence_url: evidence
+      }).then(() => {
+        showToast('⚠️ Case successfully filed. Admin mediation holds activated.', 'error');
+        
+        // Reset form fields
+        document.getElementById('dispute-title-field').value = '';
+        document.getElementById('dispute-reason-field').value = '';
+        document.getElementById('dispute-evidence-field').value = '';
+
+        loadDisputesData();
+      }).catch(err => {
+        showToast('Failed to log dispute: ' + err.message, 'error');
+      });
+    }
+  </script>
+</body>
+</html>

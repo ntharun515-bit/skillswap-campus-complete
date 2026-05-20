@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moderation Reports | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <style>
+    .report-card {
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      border-radius: var(--radius-lg);
+      background: var(--bg-glass);
+      border: 1px solid var(--border);
+      transition: transform var(--transition), border-color var(--transition);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .report-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(239, 68, 68, 0.2);
+    }
+    .report-card.resolved {
+      border-left: 4px solid var(--success);
+      opacity: 0.75;
+    }
+    .report-card.pending {
+      border-left: 4px solid var(--error);
+    }
+    .flag-icon-box {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.15rem;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('admin', 'reports', 'Violation Moderation', function(el) {
+      el.innerHTML = `
+        <div class="stats-grid" id="reports-stats" style="margin-bottom:2rem">
+          <div class="glass card skeleton" style="height:100px"></div>
+          <div class="glass card skeleton" style="height:100px"></div>
+          <div class="glass card skeleton" style="height:100px"></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 300px;gap:2rem">
+          <div>
+            <article class="glass card" style="min-height:400px">
+              <div style="display:flex;justify-content:between;align-items:center;margin-bottom:1.5rem">
+                <div>
+                  <h3 style="font-size:1.25rem;margin:0">🚩 Flagged Infracions Timeline</h3>
+                  <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.25rem">Review student code, profiles, and listings flagged for system violations.</p>
+                </div>
+                <div style="margin-left:auto">
+                  <select id="filter-status" style="font-size:0.85rem;padding:0.4rem 0.8rem">
+                    <option value="pending">⚠️ Pending Review</option>
+                    <option value="all">📁 All Reports</option>
+                  </select>
+                </div>
+              </div>
+
+              <div id="reports-timeline" class="grid grid-2">
+                <div class="glass card skeleton" style="height:120px"></div>
+              </div>
+            </article>
+          </div>
+
+          <div>
+            <div style="display:flex;flex-direction:column;gap:1.5rem;position:sticky;top:1rem">
+              <!-- Safety Instructions -->
+              <article class="glass card" style="padding:1.5rem">
+                <h4 style="font-size:1.1rem;margin-bottom:0.5rem">🛡️ Moderation Guide</h4>
+                <p style="color:var(--text-secondary);font-size:0.8rem;line-height:1.45;margin:0">
+                  Verify reported users or campaigns before resolving or banning. If a profile details contain spam or plagiarism, suspend the offending account immediately under User Accounts.
+                </p>
+              </article>
+
+              <!-- Shortcuts -->
+              <article class="glass card" style="padding:1.5rem">
+                <h4 style="font-size:1.1rem;margin-bottom:0.75rem">⚡ Platform Toggles</h4>
+                <button class="btn btn-outline" style="width:100%;font-size:0.85rem" onclick="window.location.href='users.html'">👤 User Suspend Console</button>
+              </article>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const statsEl = document.getElementById('reports-stats');
+      const timelineEl = document.getElementById('reports-timeline');
+      const statusFilter = document.getElementById('filter-status');
+
+      async function loadReportsWorkspace() {
+        try {
+          statsEl.innerHTML = `
+            <div class="glass card skeleton" style="height:100px"></div>
+            <div class="glass card skeleton" style="height:100px"></div>
+            <div class="glass card skeleton" style="height:100px"></div>
+          `;
+
+          const reps = await API.get('/admin/reports');
+
+          const totalFlags = reps.length;
+          const pendingCount = reps.filter(r => r.status === 'open' || r.status === 'pending').length;
+          const resolvedCount = reps.filter(r => r.status === 'resolved').length;
+
+          statsEl.innerHTML = `
+            <article class="glass stat-card">
+              <span class="label">🚩 Cumulative Flags</span>
+              <span class="value">${totalFlags}</span>
+            </article>
+            <article class="glass stat-card">
+              <span class="label">⚠️ Pending Action</span>
+              <span class="value" style="color:var(--error)">${pendingCount} Cases</span>
+            </article>
+            <article class="glass stat-card">
+              <span class="label">✅ Resolved Cases</span>
+              <span class="value" style="color:var(--success)">${resolvedCount} Closed</span>
+            </article>
+          `;
+
+          const selectedFilter = statusFilter.value;
+          const filtered = reps.filter(r => {
+            if (selectedFilter === 'pending') {
+              return r.status === 'open' || r.status === 'pending';
+            }
+            return true;
+          });
+
+          if (filtered.length === 0) {
+            timelineEl.innerHTML = `
+              <div style="grid-column:1/-1;text-align:center;padding:4rem 2rem;color:var(--text-secondary)">
+                <span style="font-size:3rem">🛡️</span>
+                <p style="margin-top:1rem">No reported violations matches your filter.</p>
+              </div>
+            `;
+            return;
+          }
+
+          timelineEl.innerHTML = filtered.map(r => {
+            const isPending = r.status === 'open' || r.status === 'pending';
+            const isUserFlag = r.reported_user_id ? true : false;
+            
+            // Choose Badge Class
+            const badgeType = isUserFlag 
+              ? `<span class="badge" style="background:rgba(13, 148, 136, 0.15);color:var(--accent)">👤 Profile Violator</span>`
+              : `<span class="badge" style="background:rgba(245,158,11,0.15);color:var(--warning)">💼 Campaign Spam</span>`;
+
+            // Action Items markup
+            const actionHtml = isPending 
+              ? `
+                <div style="display:flex;gap:0.4rem;width:100%;margin-top:1rem">
+                  <button class="btn btn-primary btn-sm resolve-btn" data-id="${r.id}" style="flex:1">✔️ Resolve</button>
+                  <button class="btn btn-ghost btn-sm suspend-shortcut-btn" onclick="window.location.href='users.html'" style="color:var(--error);border-color:rgba(239,68,68,0.1)">🚨 Ban User</button>
+                </div>
+              `
+              : `<span style="font-size:0.8rem;color:var(--success);font-weight:700;display:block;margin-top:1rem;text-align:center">🎉 Resolved & Settled</span>`;
+
+            return `
+              <article class="report-card ${isPending ? 'pending' : 'resolved'}" id="report-case-${r.id}">
+                <div>
+                  <div style="display:flex;justify-content:between;align-items:start;margin-bottom:0.75rem">
+                    <div class="flag-icon-box" style="background:${isPending ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)'};border-color:${isPending ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)'}">
+                      ${isPending ? '🚩' : '✅'}
+                    </div>
+                    <div style="display:flex;flex-direction:column;align-items:end;margin-left:auto;gap:0.25rem">
+                      ${badgeType}
+                      <span style="font-size:0.7rem;color:var(--text-secondary)">${formatDate(r.created_at)}</span>
+                    </div>
+                  </div>
+                  
+                  <p style="font-size:0.88rem;color:var(--text-primary);line-height:1.45;margin:0.25rem 0">${r.reason}</p>
+                </div>
+
+                <div>
+                  ${actionHtml}
+                </div>
+              </article>
+            `;
+          }).join('');
+
+          // Bind Resolve Buttons
+          timelineEl.querySelectorAll('.resolve-btn').forEach(btn => {
+            btn.onclick = async () => {
+              const rid = btn.dataset.id;
+              try {
+                await API.put('/admin/reports', { report_id: +rid, status: 'resolved' });
+                showToast('Violation report marked resolved', 'success');
+                
+                // Animate out
+                const card = document.getElementById(`report-case-${rid}`);
+                if (card) {
+                  card.style.opacity = '0';
+                  card.style.transform = 'scale(0.9)';
+                  card.style.transition = 'opacity 0.3s, transform 0.3s';
+                  setTimeout(loadReportsWorkspace, 300);
+                } else {
+                  loadReportsWorkspace();
+                }
+              } catch (err) {
+                showToast('Failed to resolve report: ' + err.message, 'error');
+              }
+            };
+          });
+
+        } catch (err) {
+          showToast('Failed to load violation directory: ' + err.message, 'error');
+        }
+      }
+
+      statusFilter.onchange = loadReportsWorkspace;
+      loadReportsWorkspace();
+    });
+  </script>
+</body>
+</html>

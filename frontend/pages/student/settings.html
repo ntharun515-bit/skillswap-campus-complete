@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings Workspace | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('student', 'settings', 'Profile Settings', function(el) {
+      el.innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:2rem">
+          <div>
+            <form id="sf" class="glass card" style="padding:2rem;display:flex;flex-direction:column;gap:1.5rem">
+              <h3 style="font-size:1.25rem;font-weight:800;letter-spacing:-0.02em;margin-bottom:0.25rem">👤 Freelancer Profile</h3>
+              <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1rem">Update your campaign visibility, hourly rates, and portfolio details.</p>
+
+              <div class="form-group">
+                <label style="font-weight:600;font-size:0.85rem">Professional Headline</label>
+                <input type="text" id="hl" placeholder="e.g. Python Developer & UX Designer" required style="width:100%">
+              </div>
+
+              <div class="form-group">
+                <label style="font-weight:600;font-size:0.85rem">Detailed Bio</label>
+                <textarea id="bio" rows="4" placeholder="Introduce your expertise, campus classes, and passion..." required style="width:100%"></textarea>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+                <div class="form-group">
+                  <label style="font-weight:600;font-size:0.85rem">Hourly Rate (Credits / Hr)</label>
+                  <input type="number" id="rate" min="5" placeholder="15" style="width:100%">
+                </div>
+                <div class="form-group">
+                  <label style="font-weight:600;font-size:0.85rem">Availability</label>
+                  <select id="avail" style="width:100%">
+                    <option value="available">🟢 Available for Projects</option>
+                    <option value="unavailable">🔴 Busy / Fully Booked</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+                <div class="form-group">
+                  <label style="font-weight:600;font-size:0.85rem">GitHub Profile (URL)</label>
+                  <input type="url" id="github" placeholder="https://github.com/username" style="width:100%">
+                </div>
+                <div class="form-group">
+                  <label style="font-weight:600;font-size:0.85rem">LinkedIn Profile (URL)</label>
+                  <input type="url" id="linkedin" placeholder="https://linkedin.com/in/username" style="width:100%">
+                </div>
+              </div>
+
+              <!-- LinkedIn-style rich history -->
+              <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-top:0.5rem">
+                <h4 style="font-size:1.05rem;font-weight:800;letter-spacing:-0.01em;margin-bottom:0.25rem;color:var(--accent);display:flex;align-items:center;gap:0.4rem">
+                  <span>💼</span> LinkedIn Professional History
+                </h4>
+                <p style="color:var(--text-secondary);font-size:0.8rem;margin-bottom:1.25rem">Enter your experience and academic details. These will be intelligently compiled into your executive AI CV.</p>
+
+                <div class="form-group" style="margin-bottom:1.25rem">
+                  <label style="font-weight:600;font-size:0.85rem">Work Experience</label>
+                  <textarea id="work_experience" rows="3" placeholder="e.g.&#10;• Software Engineer Intern at TechCorp (June 2025 - Present)&#10;  Designed real-time messaging systems and integrated SQLite transactions." style="width:100%"></textarea>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0.5rem">
+                  <label style="font-weight:600;font-size:0.85rem">Education & Academics</label>
+                  <textarea id="education" rows="2" placeholder="e.g.&#10;• B.S. in Computer Science, State University (Graduation: 2027)" style="width:100%"></textarea>
+                </div>
+              </div>
+
+              <button class="btn btn-primary" type="submit" style="align-self:end;margin-top:1rem">Save Changes</button>
+            </form>
+          </div>
+
+          <div>
+            <div style="display:flex;flex-direction:column;gap:1.5rem">
+              <!-- AI Bio Assistant -->
+              <article class="glass card" style="padding:1.5rem">
+                <h4 style="font-size:1.1rem;font-weight:800;display:flex;align-items:center;gap:0.5rem">
+                  <span>💡</span> AI Profile Summary
+                </h4>
+                <p style="color:var(--text-secondary);font-size:0.8rem;margin-top:0.25rem;line-height:1.4">
+                  Generate a structured, professional summary of your profile powered by your skills and ratings.
+                </p>
+                
+                <div id="sum-container" style="display:none;margin-top:1rem;padding:0.75rem 1rem;border-left:2px solid var(--accent);background:rgba(255,255,255,0.01);font-size:0.85rem;line-height:1.45;color:var(--text-secondary)">
+                  <p id="sum-text" style="margin:0"></p>
+                </div>
+
+                <button class="btn btn-outline" id="btn-ai-summary" style="width:100%;margin-top:1.25rem;font-size:0.85rem">
+                  ✨ Build AI Summary
+                </button>
+              </article>
+
+              <!-- Account Verification Widget -->
+              <article class="glass card" style="padding:1.5rem">
+                <h4 style="font-size:1.1rem;margin-bottom:0.5rem">🛡️ Account Verification</h4>
+                <p style="color:var(--text-secondary);font-size:0.8rem;line-height:1.4">
+                  Want to unlock your Verified Pro badge and rank higher on campus leaderboards? Pass any Skill Quiz successfully!
+                </p>
+                <button class="btn btn-ghost" onclick="window.location.href='verification.html'" style="width:100%;margin-top:1rem;font-size:0.85rem">
+                  ✍️ Take Timed Quiz
+                </button>
+              </article>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const bio = document.getElementById('bio');
+      const hl = document.getElementById('hl');
+      const rate = document.getElementById('rate');
+      const avail = document.getElementById('avail');
+      const github = document.getElementById('github');
+      const linkedin = document.getElementById('linkedin');
+      const workExp = document.getElementById('work_experience');
+      const edu = document.getElementById('education');
+      const sf = document.getElementById('sf');
+      
+      const aiBtn = document.getElementById('btn-ai-summary');
+      const sumContainer = document.getElementById('sum-container');
+      const sumText = document.getElementById('sum-text');
+
+      // Load Profile Data
+      API.get('/users/profile').then(p => {
+        bio.value = p.bio || '';
+        hl.value = p.headline || '';
+        rate.value = p.hourly_rate || '';
+        avail.value = p.availability || 'available';
+        github.value = p.github_url || '';
+        linkedin.value = p.linkedin_url || '';
+        workExp.value = p.work_experience || '';
+        edu.value = p.education || '';
+        
+        if (p.ai_summary) {
+          sumText.textContent = p.ai_summary;
+          sumContainer.style.display = 'block';
+        }
+      }).catch(err => {
+        showToast('Failed to load profile settings: ' + err.message, 'error');
+      });
+
+      // Submit settings
+      sf.onsubmit = async e => {
+        e.preventDefault();
+        try {
+          await API.put('/users/profile', {
+            bio: bio.value.trim(),
+            headline: hl.value.trim(),
+            hourly_rate: +rate.value || null,
+            availability: avail.value,
+            github_url: github.value.trim(),
+            linkedin_url: linkedin.value.trim(),
+            work_experience: workExp.value.trim(),
+            education: edu.value.trim()
+          });
+          
+          showToast('Profile updated successfully!', 'success');
+        } catch (err) {
+          showToast('Failed to save profile: ' + err.message, 'error');
+        }
+      };
+
+      // AI Summary generator trigger
+      aiBtn.onclick = async () => {
+        aiBtn.disabled = true;
+        aiBtn.innerHTML = `<span>⏳</span> Generating...`;
+        
+        try {
+          const res = await API.post('/ai/profile-summary', {});
+          sumText.textContent = res.summary;
+          sumContainer.style.display = 'block';
+          showToast('AI profile summary generated and saved!', 'success');
+        } catch (err) {
+          showToast('Failed to trigger AI builder: ' + err.message, 'error');
+        } finally {
+          aiBtn.disabled = false;
+          aiBtn.innerHTML = `✨ Build AI Summary`;
+        }
+      };
+
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <style>
+    .event-log-row {
+      display: flex;
+      align-items: start;
+      gap: 1rem;
+      padding: 0.85rem 1rem;
+      margin-bottom: 0.5rem;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .event-badge {
+      font-family: var(--font-heading);
+      font-size: 0.68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.2rem 0.5rem;
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+    }
+    
+    /* Live Operational Alert Keyframe Animation */
+    @keyframes fadeInSlide {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+        background: rgba(16, 185, 129, 0.08);
+        border-color: rgba(16, 185, 129, 0.3);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+        background: rgba(255, 255, 255, 0.01);
+        border-color: var(--border);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('admin', 'dashboard', 'System Operations', function(el) {
+      el.innerHTML = `
+        <div class="stats-grid" id="admin-stats" style="margin-bottom:2rem">
+          <div class="glass card skeleton" style="height:100px"></div>
+          <div class="glass card skeleton" style="height:100px"></div>
+          <div class="glass card skeleton" style="height:100px"></div>
+          <div class="glass card skeleton" style="height:100px"></div>
+          <div class="glass card skeleton" style="height:100px"></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:2rem">
+          <div>
+            <!-- Locked Escrow Dispute Mediation Console -->
+            <article class="glass card" style="margin-bottom:2rem;min-height:200px;position:relative" id="dispute-console">
+              <h3 style="font-size:1.25rem;margin-bottom:0.25rem;display:flex;align-items:center;gap:0.4rem">
+                <span>⚖️</span> Escrow Dispute Mediation Center
+              </h3>
+              <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.5rem">Review and adjudicate active billing disputes. Issue refunds to clients or release funds directly to freelancers.</p>
+              
+              <div id="disputes-list" style="display:flex;flex-direction:column;gap:1rem">
+                <div class="glass card skeleton" style="height:60px"></div>
+              </div>
+            </article>
+
+            <!-- Event Logs Timeline -->
+            <article class="glass card" style="min-height:400px">
+              <h3 style="font-size:1.25rem;margin-bottom:0.25rem;display:flex;align-items:center;gap:0.4rem">
+                <span>🖥️</span> Live Operational Broadcast Terminal
+              </h3>
+              <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.5rem">Running audit log of real-time database transactions, skill verifications, and user credentials.</p>
+              
+              <div id="activity-timeline" style="display:flex;flex-direction:column">
+                <div class="glass card skeleton" style="height:60px;margin-bottom:0.5rem"></div>
+                <div class="glass card skeleton" style="height:60px;margin-bottom:0.5rem"></div>
+              </div>
+            </article>
+          </div>
+
+          <div>
+            <div style="display:flex;flex-direction:column;gap:1.5rem;position:sticky;top:1rem">
+              <!-- Quick Navigation -->
+              <article class="glass card" style="padding:1.5rem">
+                <h4 style="font-size:1.1rem;margin-bottom:0.75rem">🛡️ Safety Moderation Engine</h4>
+                <div style="display:flex;flex-direction:column;gap:0.75rem">
+                  <button class="btn btn-outline" style="width:100%;font-size:0.85rem" onclick="window.location.href='users.html'">👤 User Accounts</button>
+                  <button class="btn btn-outline" style="width:100%;font-size:0.85rem" onclick="window.location.href='reports.html'">🚩 Flags & Reports</button>
+                  <button class="btn btn-outline" style="width:100%;font-size:0.85rem" onclick="window.location.href='verification.html'">✅ Skill Verifications</button>
+                  <button class="btn btn-outline" style="width:100%;font-size:0.85rem" onclick="window.location.href='categories.html'">🏷️ Categories Manager</button>
+                </div>
+              </article>
+
+              <!-- Server Config Guide -->
+              <article class="glass card" style="padding:1.5rem">
+                <h4 style="font-size:1.1rem;margin-bottom:0.5rem">⚙️ Server Status</h4>
+                <p style="color:var(--text-secondary);font-size:0.8rem;line-height:1.45;margin:0">
+                  Engine: <strong>Flask + SocketIO</strong><br>
+                  Database URI: <span style="font-family:monospace;font-size:0.75rem;color:var(--accent)">SQLAlchemy ORM</span><br>
+                  Platform State: <span style="color:var(--success);font-weight:700">🟢 Live Operational</span>
+                </p>
+              </article>
+
+              <!-- AI Security Fraud Scanner -->
+              <article class="glass card" style="padding:1.5rem">
+                <h4 style="font-size:1.1rem;margin-bottom:0.75rem;display:flex;align-items:center;gap:0.4rem">
+                  <span>🤖</span> AI Security Scam Scanner
+                </h4>
+                <p style="color:var(--text-secondary);font-size:0.8rem;line-height:1.4;margin-bottom:1rem">
+                  Analyze profile texts and contact patterns for fraudulent or off-platform behaviors.
+                </p>
+                <div style="display:flex;gap:0.5rem;margin-bottom:1rem">
+                  <input type="number" id="fraud-user-id" placeholder="Enter User ID" class="form-control" style="flex:1;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-primary);padding:0.4rem 0.6rem;font-size:0.85rem">
+                  <button class="btn btn-primary" style="padding:0.4rem 0.8rem;font-size:0.85rem;font-weight:600" onclick="scanUserFraud()">Scan</button>
+                </div>
+                <div id="fraud-result" style="display:none;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--radius-md);padding:0.85rem;font-size:0.8rem">
+                  <!-- Result will be populated here -->
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const statsEl = document.getElementById('admin-stats');
+      const timelineEl = document.getElementById('activity-timeline');
+
+      function renderEventRow(l) {
+        let actBadge = '';
+        let dateStr = formatDate(l.created_at);
+
+        const actionLow = l.action.toLowerCase();
+        if (actionLow.includes('verify') || actionLow.includes('skill')) {
+          actBadge = `<span class="event-badge" style="background:rgba(139, 92, 246, 0.15);color:var(--accent)">Verification</span>`;
+        } else if (actionLow.includes('payment') || actionLow.includes('escrow') || actionLow.includes('payout')) {
+          actBadge = `<span class="event-badge" style="background:rgba(16,185,129,0.15);color:var(--success)">Financial</span>`;
+        } else if (actionLow.includes('register') || actionLow.includes('user')) {
+          actBadge = `<span class="event-badge" style="background:rgba(139, 92, 246, 0.15);color:var(--accent)">Account</span>`;
+        } else {
+          actBadge = `<span class="event-badge" style="background:rgba(255,255,255,0.05);color:var(--text-secondary)">System</span>`;
+        }
+
+        return `
+          <div class="event-log-row" style="animation: fadeInSlide 0.45s ease forwards">
+            ${actBadge}
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between;margin-bottom:0.15rem">
+                <strong style="color:var(--text-primary)">${l.action.toUpperCase()}</strong>
+                <span style="font-size:0.75rem;color:var(--text-secondary);margin-left:auto">${dateStr}</span>
+              </div>
+              <span style="color:var(--text-secondary);line-height:1.4">${l.details || ''}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      async function loadAdminMonitor() {
+        try {
+          statsEl.innerHTML = `
+            <div class="glass card skeleton" style="height:100px"></div>
+            <div class="glass card skeleton" style="height:100px"></div>
+            <div class="glass card skeleton" style="height:100px"></div>
+            <div class="glass card skeleton" style="height:100px"></div>
+            <div class="glass card skeleton" style="height:100px"></div>
+          `;
+
+          const [stats, logs, disputes] = await Promise.all([
+            API.get('/admin/dashboard'),
+            API.get('/admin/activity'),
+            API.get('/admin/disputes').catch(() => [])
+          ]);
+
+          // Render system count metrics
+          statsEl.innerHTML = `
+            <article class="glass stat-card">
+              <span class="label">👥 Total Accounts</span>
+              <span class="value" style="color:var(--accent)">${stats.users_count || 0}</span>
+            </article>
+            <article class="glass stat-card">
+              <span class="label">💼 Projects Posted</span>
+              <span class="value">${stats.projects_count || 0}</span>
+            </article>
+            <article class="glass stat-card">
+              <span class="label">🚩 Flags & Reports</span>
+              <span class="value" style="color:var(--error)">${stats.reports_count || 0} Reports</span>
+            </article>
+            <article class="glass stat-card">
+              <span class="label">💵 Escrow Settlements</span>
+              <span class="value" style="color:var(--success)">${stats.payouts_count || 0} Paid</span>
+            </article>
+            <article class="glass stat-card">
+              <span class="label">🏢 Platform Fees (5%)</span>
+              <span class="value" style="color:var(--accent)">$${(stats.platform_fees || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+            </article>
+          `;
+
+          // Render Live Timeline Events
+          if (logs.length === 0) {
+            timelineEl.innerHTML = `<p style="color:var(--text-secondary);font-size:0.9rem;text-align:center;padding:2rem 0">No system events logged in database yet.</p>`;
+          } else {
+            timelineEl.innerHTML = logs.map(l => renderEventRow(l)).join('');
+          }
+
+          // Render Escrow Disputes
+          renderDisputes(disputes);
+
+        } catch (err) {
+          showToast('Failed to load system operations workspace: ' + err.message, 'error');
+        }
+      }
+
+      function renderDisputes(disputes) {
+        const disputesEl = document.getElementById('disputes-list');
+        if (!disputesEl) return;
+        
+        if (!disputes || disputes.length === 0) {
+          disputesEl.innerHTML = `<p style="color:var(--text-secondary);font-size:0.85rem;text-align:center;padding:2rem 0">No active or resolved disputes in escrow system.</p>`;
+          return;
+        }
+
+        disputesEl.innerHTML = disputes.map(d => {
+          const isResolved = d.status !== 'open';
+          const badgeColor = isResolved ? 'var(--success)' : 'var(--error)';
+          const actionButtons = isResolved ? 
+            `<div style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;margin-top:0.5rem">Resolved Resolution State</div>` : 
+            `<div style="display:flex;gap:0.5rem;margin-top:0.8rem">
+              <button class="btn btn-outline" style="padding:0.3rem 0.6rem;font-size:0.75rem;color:var(--error);border-color:var(--error)" onclick="resolveDispute(${d.id}, 'refund')">Refund Client</button>
+              <button class="btn btn-primary" style="padding:0.3rem 0.6rem;font-size:0.75rem" onclick="resolveDispute(${d.id}, 'release')">Release to Freelancer</button>
+             </div>`;
+
+          return `
+            <div class="glass card" style="padding:1rem;background:rgba(255,255,255,0.01);border:1px solid var(--border);margin-bottom:0.5rem">
+              <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:0.5rem">
+                <div>
+                  <h5 style="margin:0;font-size:0.95rem;color:var(--text-primary)">${d.title}</h5>
+                  <span style="font-size:0.75rem;color:var(--text-secondary)">Project: <strong>${d.project_title}</strong> (ID: ${d.project_id})</span>
+                  <br>
+                  <span style="font-size:0.75rem;color:var(--text-secondary)">Reporter: <strong>${d.reporter_name}</strong> (ID: ${d.reporter_id})</span>
+                </div>
+                <div style="text-align:right">
+                  <span style="font-size:0.8rem;color:var(--success);font-weight:700">$${d.amount.toFixed(2)}</span>
+                  <br>
+                  <span style="font-size:0.7rem;padding:0.15rem 0.4rem;border-radius:var(--radius-sm);background:rgba(255,255,255,0.05);color:${badgeColor};text-transform:uppercase;font-weight:700">${d.status}</span>
+                </div>
+              </div>
+              <p style="margin:0.25rem 0;font-size:0.8rem;color:var(--text-secondary);line-height:1.4">${d.reason}</p>
+              ${d.evidence_url ? `<div style="margin-top:0.4rem;font-size:0.75rem"><a href="${d.evidence_url}" target="_blank" style="color:var(--accent);text-decoration:none">🔗 View Attached Evidence Document</a></div>` : ''}
+              ${actionButtons}
+            </div>
+          `;
+        }).join('');
+      }
+
+      window.resolveDispute = async function(id, action) {
+        const actionText = action === 'release' ? 'Release escrow funds to the freelancer' : 'Refund escrow funds back to the client';
+        if (!confirm(`Are you absolutely sure you want to resolve this dispute and: ${actionText}?`)) {
+          return;
+        }
+
+        try {
+          const res = await API.post(`/admin/disputes/${id}/resolve`, { action });
+          showToast(res.message || 'Dispute resolved successfully!', 'success');
+          loadAdminMonitor();
+        } catch (err) {
+          showToast('Failed to resolve dispute: ' + err.message, 'error');
+        }
+      }
+
+      window.scanUserFraud = async function() {
+        const userIdInput = document.getElementById('fraud-user-id');
+        const resultEl = document.getElementById('fraud-result');
+        if (!userIdInput || !resultEl) return;
+        
+        const userId = userIdInput.value.trim();
+        if (!userId) {
+          showToast('Please enter a User ID to analyze.', 'warning');
+          return;
+        }
+
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = `<div class="skeleton" style="height:80px"></div>`;
+
+        try {
+          const res = await API.get(`/ai/detect-fraud?user_id=${userId}`);
+          
+          let scoreColor = 'var(--success)';
+          if (res.risk_score > 60) scoreColor = 'var(--error)';
+          else if (res.risk_score > 30) scoreColor = 'var(--warning)';
+
+          let reasonsHtml = '';
+          if (res.reasons && res.reasons.length > 0) {
+            reasonsHtml = `<ul style="margin:0.5rem 0 0 0;padding-left:1.2rem;color:var(--text-secondary);line-height:1.4">
+              ${res.reasons.map(r => `<li>${r}</li>`).join('')}
+            </ul>`;
+          } else {
+            reasonsHtml = `<p style="margin:0.5rem 0 0 0;color:var(--text-secondary)">No suspicious activity triggers detected in profile analysis.</p>`;
+          }
+
+          resultEl.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.6rem">
+              <span style="font-weight:600;color:var(--text-primary)">AI Analysis Verdict:</span>
+              <span style="font-size:0.75rem;font-weight:800;padding:0.15rem 0.4rem;border-radius:var(--radius-sm);background:rgba(255,255,255,0.05);color:${res.is_scam ? 'var(--error)' : 'var(--success)'}">
+                ${res.is_scam ? '🚨 HIGH RISK FLAG' : '🟢 SAFE'}
+              </span>
+            </div>
+            <div style="margin-bottom:0.6rem">
+              <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:0.2rem">
+                <span>Calculated Threat Index:</span>
+                <strong style="color:${scoreColor}">${res.risk_score}%</strong>
+              </div>
+              <div style="width:100%;height:6px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">
+                <div style="width:${res.risk_score}%;height:100%;background:${scoreColor};border-radius:3px"></div>
+              </div>
+            </div>
+            <div style="font-size:0.75rem;border-top:1px solid var(--border);padding-top:0.5rem">
+              <strong>Risk Context / Analysis Logs:</strong>
+              ${reasonsHtml}
+            </div>
+          `;
+        } catch (err) {
+          resultEl.innerHTML = `<span style="color:var(--error);font-size:0.75rem">Analysis Failed: ${err.message}</span>`;
+        }
+      }
+
+      loadAdminMonitor();
+
+      // Connect socket listener for live broadcasts
+      const socket = initSocket();
+      if (socket) {
+        socket.on('admin_activity', function(data) {
+          showToast('Live Operational Activity Logged!', 'success');
+          
+          if (timelineEl.querySelector('p')) {
+            timelineEl.innerHTML = '';
+          }
+
+          // Prepend the live row
+          const rowHtml = renderEventRow(data);
+          const temp = document.createElement('div');
+          temp.innerHTML = rowHtml;
+          const child = temp.firstElementChild;
+          timelineEl.insertBefore(child, timelineEl.firstChild);
+
+          // Bound items limit
+          while (timelineEl.children.length > 12) {
+            timelineEl.lastElementChild.remove();
+          }
+
+          // Sync operational counts dynamically
+          API.get('/admin/dashboard').then(stats => {
+            statsEl.innerHTML = `
+              <article class="glass stat-card">
+                <span class="label">👥 Total Accounts</span>
+                <span class="value" style="color:var(--accent)">${stats.users_count || 0}</span>
+              </article>
+              <article class="glass stat-card">
+                <span class="label">💼 Projects Posted</span>
+                <span class="value">${stats.projects_count || 0}</span>
+              </article>
+              <article class="glass stat-card">
+                <span class="label">🚩 Flags & Reports</span>
+                <span class="value" style="color:var(--error)">${stats.reports_count || 0} Reports</span>
+              </article>
+              <article class="glass stat-card">
+                <span class="label">💵 Escrow Settlements</span>
+                <span class="value" style="color:var(--success)">${stats.payouts_count || 0} Paid</span>
+              </article>
+              <article class="glass stat-card">
+                <span class="label">🏢 Platform Fees (5%)</span>
+                <span class="value" style="color:var(--accent)">$${(stats.platform_fees || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+              </article>
+            `;
+          }).catch(() => {});
+          
+          // Re-load disputes to capture any resolutions
+          API.get('/admin/disputes').then(renderDisputes).catch(() => {});
+        });
+      }
+    });
+  </script>
+</body>
+</html>

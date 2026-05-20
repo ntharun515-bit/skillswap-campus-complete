@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Find Campus Talent | SkillSwap</title>
+  <meta name="description" content="Browse verified student freelancers on SkillSwap. Filter by skill, rating, and availability.">
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <style>
+    .fl-hero{padding:4rem 0 2rem;text-align:center}
+    .fl-hero h1{font-size:clamp(1.8rem,4vw,2.6rem);font-weight:900;font-family:var(--font-heading);margin-bottom:.5rem}
+    .fl-hero p{font-size:1.05rem;color:var(--text-secondary);max-width:550px;margin:0 auto 1.5rem}
+    .fl-search{display:flex;gap:.75rem;max-width:620px;margin:0 auto;flex-wrap:wrap}
+    .fl-search input,.fl-search select{flex:1;min-width:160px;padding:.75rem 1rem;border-radius:var(--radius-lg);border:1px solid var(--border);background:var(--bg-glass);color:var(--text-primary);font-size:.95rem;backdrop-filter:blur(var(--blur))}
+    .fl-count{text-align:center;font-size:.88rem;color:var(--text-secondary);margin:1.5rem 0 .5rem;font-weight:600}
+    .fl-card{padding:1.75rem;display:flex;flex-direction:column;gap:.75rem;transition:transform .25s,border-color .25s}
+    .fl-card:hover{transform:translateY(-4px);border-color:var(--accent)}
+    .fl-card-top{display:flex;align-items:center;gap:1rem}
+    .fl-avatar{width:52px;height:52px;border-radius:50%;background:var(--accent-glow);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--accent);font-size:1.2rem;font-family:var(--font-heading);flex-shrink:0}
+    .fl-name{font-size:1.05rem;font-weight:700}
+    .fl-headline{font-size:.85rem;color:var(--text-secondary)}
+    .fl-campus{font-size:.75rem;color:var(--text-secondary);opacity:.8}
+    .fl-stats{display:flex;gap:1.25rem;font-size:.85rem;color:var(--text-secondary);flex-wrap:wrap}
+    .fl-stats strong{color:var(--text-primary)}
+    .fl-skills{display:flex;gap:.4rem;flex-wrap:wrap}
+    .fl-skill{padding:.2rem .6rem;border-radius:999px;font-size:.75rem;font-weight:600;background:rgba(13,148,136,.08);color:var(--accent);border:1px solid rgba(13,148,136,.15)}
+    .fl-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:.75rem;border-top:1px solid var(--border)}
+    .fl-rate{font-weight:800;color:var(--success);font-size:1rem}
+    .fl-badges{display:flex;gap:.4rem}
+    .fl-badge{font-size:.75rem;padding:.15rem .5rem;border-radius:999px;font-weight:700}
+    .fl-verified{background:rgba(16,185,129,.12);color:var(--success)}
+    .fl-featured{background:rgba(245,158,11,.12);color:var(--warning)}
+  </style>
+</head>
+<body>
+  <div id="nav"></div>
+  <main id="main">
+    <section class="fl-hero container">
+      <h1>Discover Verified Campus Talent</h1>
+      <p>Browse skill-verified student freelancers. Filter by expertise, rating, and availability to find the perfect match for your project.</p>
+      <div class="fl-search">
+        <input type="text" id="fl-q" placeholder="🔍  Search name, skill, or headline..." oninput="searchFreelancers()">
+        <select id="fl-sort" onchange="searchFreelancers()">
+          <option value="rating">⭐ Highest Rated</option>
+          <option value="rate-low">💰 Lowest Rate</option>
+          <option value="rate-high">💎 Highest Rate</option>
+        </select>
+        <button class="btn btn-primary" onclick="searchFreelancers()">Search</button>
+      </div>
+    </section>
+
+    <section class="section container" style="padding:0 0 5rem">
+      <div class="fl-count" id="fl-count">Loading freelancers...</div>
+      <div class="grid grid-2" id="fl-list" style="gap:1.25rem"></div>
+    </section>
+  </main>
+  <div id="footer"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script>
+    document.getElementById('nav').innerHTML = renderNavbar('freelancers');
+    document.getElementById('footer').innerHTML = renderFooter();
+
+    let allFreelancers = [];
+
+    async function loadFreelancers() {
+      try {
+        allFreelancers = await API.get('/users/freelancers');
+        renderFreelancers(allFreelancers);
+      } catch(e) {
+        document.getElementById('fl-list').innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text-secondary);padding:3rem">Unable to load freelancers. Ensure the backend is running.</p>';
+        document.getElementById('fl-count').textContent = '';
+      }
+    }
+
+    function searchFreelancers() {
+      const q = document.getElementById('fl-q').value.toLowerCase().trim();
+      const sort = document.getElementById('fl-sort').value;
+      let filtered = allFreelancers.filter(f => {
+        const name = (f.user?.full_name || '').toLowerCase();
+        const headline = (f.headline || '').toLowerCase();
+        const skills = (f.skills || []).map(s => s.name?.toLowerCase() || '').join(' ');
+        return !q || name.includes(q) || headline.includes(q) || skills.includes(q);
+      });
+      if (sort === 'rating') filtered.sort((a,b) => (b.rating_avg||0) - (a.rating_avg||0));
+      else if (sort === 'rate-low') filtered.sort((a,b) => (a.hourly_rate||0) - (b.hourly_rate||0));
+      else if (sort === 'rate-high') filtered.sort((a,b) => (b.hourly_rate||0) - (a.hourly_rate||0));
+      renderFreelancers(filtered);
+    }
+
+    function renderFreelancers(list) {
+      const container = document.getElementById('fl-list');
+      document.getElementById('fl-count').textContent = `${list.length} freelancer${list.length !== 1 ? 's' : ''} found`;
+      if (!list.length) {
+        container.innerHTML = '<div class="glass card" style="grid-column:1/-1;text-align:center;padding:3rem"><p style="color:var(--text-secondary)">No freelancers match your search. Try different keywords.</p></div>';
+        return;
+      }
+      container.innerHTML = list.map(f => {
+        const name = f.user?.full_name || 'Student';
+        const initial = name[0]?.toUpperCase() || 'S';
+        const campus = f.user?.campus || '';
+        const skills = (f.skills || []).slice(0, 4);
+        const badges = [];
+        if (f.is_verified) badges.push('<span class="fl-badge fl-verified">✅ Verified</span>');
+        if (f.is_featured) badges.push('<span class="fl-badge fl-featured">⭐ Featured</span>');
+        return `
+          <article class="glass card fl-card">
+            <div class="fl-card-top">
+              <div class="fl-avatar">${initial}</div>
+              <div>
+                <div class="fl-name">${name}</div>
+                <div class="fl-headline">${f.headline || 'Student Freelancer'}</div>
+                ${campus ? `<div class="fl-campus">📍 ${campus}</div>` : ''}
+              </div>
+            </div>
+            <div class="fl-stats">
+              <span>⭐ <strong>${(f.rating_avg||0).toFixed(1)}</strong> (${f.rating_count||0})</span>
+              <span>🏆 <strong>${f.level || 'Rookie'}</strong></span>
+              <span>📦 <strong>${f.completed_projects||0}</strong> done</span>
+            </div>
+            ${skills.length ? `<div class="fl-skills">${skills.map(s => `<span class="fl-skill">${s.name||s}</span>`).join('')}</div>` : ''}
+            <div class="fl-bottom">
+              <span class="fl-rate">${f.hourly_rate ? formatMoney(f.hourly_rate) + '/hr' : 'Flexible'}</span>
+              <div class="fl-badges">${badges.join('')}</div>
+            </div>
+          </article>`;
+      }).join('');
+    }
+
+    loadFreelancers();
+  </script>
+</body>
+</html>

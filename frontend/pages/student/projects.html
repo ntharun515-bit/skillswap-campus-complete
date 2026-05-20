@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browse Projects | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <style>
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity var(--transition);
+    }
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .modal-content {
+      width: min(500px, 90%);
+      padding: 2rem;
+      border-radius: var(--radius-lg);
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <!-- Bidding Modal Layout -->
+  <div class="modal-overlay" id="bid-modal">
+    <div class="glass modal-content">
+      <h2 style="font-size:1.5rem;margin-bottom:0.5rem">💼 Submit Project Proposal</h2>
+      <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1.5rem" id="modal-project-sub"></p>
+      
+      <form id="bid-form">
+        <input type="hidden" id="modal-project-id">
+        <div class="form-group">
+          <label>Proposed Bid Amount (Credits)</label>
+          <input type="number" id="modal-bid-amount" required min="1" step="1">
+          <span style="font-size:0.75rem;color:var(--text-secondary);margin-top:0.25rem;display:block">Enter your preferred rate. Client budget is listed.</span>
+        </div>
+        <div class="form-group">
+          <label>Cover Letter / Pitch</label>
+          <textarea id="modal-cover-letter" rows="4" placeholder="Explain why you are the best fit for this project..." required></textarea>
+        </div>
+        <div style="display:flex;gap:1rem;justify-content:end;margin-top:2rem">
+          <button type="button" class="btn btn-ghost" id="close-modal-btn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Submit Bid</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('student', 'projects', 'Browse Open Projects', function(el) {
+      el.innerHTML = `
+        <div style="display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap">
+          <input type="text" id="search-input" placeholder="Search by project name or skills required..." style="max-width:400px;flex:1">
+          <button class="btn btn-primary" id="search-btn">🔍 Search</button>
+        </div>
+        <div id="list" class="grid grid-2">
+          <div class="glass card skeleton" style="height:150px"></div>
+          <div class="glass card skeleton" style="height:150px"></div>
+        </div>
+      `;
+
+      const list = document.getElementById('list');
+      const searchInput = document.getElementById('search-input');
+      const searchBtn = document.getElementById('search-btn');
+
+      // Modals
+      const bidModal = document.getElementById('bid-modal');
+      const modalProjSub = document.getElementById('modal-project-sub');
+      const modalProjId = document.getElementById('modal-project-id');
+      const modalBidAmount = document.getElementById('modal-bid-amount');
+      const modalCoverLetter = document.getElementById('modal-cover-letter');
+      const closeModalBtn = document.getElementById('close-modal-btn');
+      const bidForm = document.getElementById('bid-form');
+
+      async function loadProjects(query = '') {
+        try {
+          list.innerHTML = `
+            <div class="glass card skeleton" style="height:150px"></div>
+            <div class="glass card skeleton" style="height:150px"></div>
+          `;
+          const all = await API.get('/projects?status=open');
+          
+          // Client filter by search query
+          const filtered = all.filter(p => {
+            if (!query) return true;
+            const text = (p.title + ' ' + p.description + ' ' + (p.skills_required || '')).toLowerCase();
+            return text.includes(query.toLowerCase());
+          });
+
+          if (filtered.length === 0) {
+            list.innerHTML = `<p style="grid-column:1/-1;text-align:center;color:var(--text-secondary);padding:2rem;">No campaigns found matching your criteria.</p>`;
+            return;
+          }
+
+          list.innerHTML = filtered.map(p => `
+            <article class="glass card" style="display:flex;flex-direction:column;justify-content:between">
+              <div>
+                <span class="badge" style="float:right">${p.category || 'Freelance'}</span>
+                <h3 style="font-size:1.2rem;margin-bottom:0.5rem;color:var(--text-primary)">${p.title}</h3>
+                <p style="font-size:0.9rem;color:var(--text-secondary);margin-bottom:1rem">${p.description.substring(0, 120)}...</p>
+                ${p.skills_required ? `<p style="font-size:0.8rem;color:var(--accent);margin-bottom:0.75rem">🛠️ ${p.skills_required}</p>` : ''}
+              </div>
+              <div style="display:flex;align-items:center;justify-content:between;margin-top:auto;padding-top:1rem;border-top:1px solid var(--border)">
+                <span style="font-weight:800;font-size:1.15rem;color:var(--success)">${formatMoney(p.budget)}</span>
+                <div style="display:flex;gap:0.5rem;margin-left:auto">
+                  <button class="btn btn-ghost btn-sm save-btn" data-id="${p.id}">❤️ Save</button>
+                  <button class="btn btn-primary btn-sm apply-btn" data-id="${p.id}" data-title="${p.title}" data-budget="${p.budget}">Bid Now</button>
+                </div>
+              </div>
+            </article>
+          `).join('');
+
+          // Bind Bid Open Action
+          list.querySelectorAll('.apply-btn').forEach(btn => {
+            btn.onclick = () => {
+              modalProjId.value = btn.dataset.id;
+              modalProjSub.textContent = `Project: "${btn.dataset.title}" · Client Budget: ${formatMoney(+btn.dataset.budget)}`;
+              modalBidAmount.value = Math.round(+btn.dataset.budget);
+              modalCoverLetter.value = '';
+              bidModal.classList.add('open');
+            };
+          });
+
+          // Bind Save Action
+          list.querySelectorAll('.save-btn').forEach(btn => {
+            btn.onclick = async () => {
+              try {
+                await API.post('/projects/saved', { project_id: +btn.dataset.id });
+                showToast('Campaign saved to bookmarks!', 'success');
+              } catch (err) {
+                showToast(err.message || 'Already saved', 'info');
+              }
+            };
+          });
+
+        } catch (err) {
+          showToast('Failed to load campaigns: ' + err.message, 'error');
+        }
+      }
+
+      closeModalBtn.onclick = () => {
+        bidModal.classList.remove('open');
+      };
+
+      bidForm.onsubmit = async e => {
+        e.preventDefault();
+        const pid = +modalProjId.value;
+        const bid = +modalBidAmount.value;
+        const cover = modalCoverLetter.value;
+
+        try {
+          await API.post(`/projects/${pid}/apply`, {
+            cover_letter: cover,
+            proposed_rate: bid
+          });
+          showToast('Your proposal was successfully submitted!', 'success');
+          bidModal.classList.remove('open');
+          loadProjects(searchInput.value);
+        } catch (err) {
+          showToast('Failed to submit proposal: ' + err.message, 'error');
+        }
+      };
+
+      searchBtn.onclick = () => loadProjects(searchInput.value.trim());
+      searchInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          searchBtn.onclick();
+        }
+      };
+
+      loadProjects();
+    });
+  </script>
+</body>
+</html>

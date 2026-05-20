@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virtual Payments Desk | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  <style>
+    .glowing-wallet {
+      background: radial-gradient(circle at 10% 20%, rgba(45, 212, 191, 0.15) 0%, rgba(2, 12, 11, 0.75) 100%) !important;
+      border: 1px solid rgba(45, 212, 191, 0.3) !important;
+      box-shadow: 0 0 25px rgba(45, 212, 191, 0.15);
+    }
+    .fund-quick-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      border-radius: var(--radius-sm);
+      padding: 0.4rem 0.75rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+      transition: all 0.2s ease;
+    }
+    .fund-quick-btn:hover {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+      box-shadow: 0 0 10px rgba(45, 212, 191, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('client', 'payments', 'Payments', function(el) {
+      el.innerHTML = `
+        <!-- Stats summary row -->
+        <div class="stats-grid" id="client-stats-row">
+          <div class="glass card skeleton" style="height:110px"></div>
+          <div class="glass card skeleton" style="height:110px"></div>
+          <div class="glass card skeleton" style="height:110px"></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:1.5rem;margin-top:1.5rem">
+          
+          <div style="display:flex;flex-direction:column;gap:1.5rem">
+            <!-- Active Escrow Contracts -->
+            <article class="glass card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3 style="font-family:var(--font-heading)">🔒 Secure Escrow Contracts</h3>
+                <span class="badge badge-success" style="font-size:0.75rem">Platform Secured</span>
+              </div>
+              <div id="escrow-contracts-list" style="display:flex;flex-direction:column;gap:0.75rem">
+                <div class="skeleton" style="height:65px"></div>
+              </div>
+            </article>
+
+            <!-- Complete Ledger History -->
+            <article class="glass card">
+              <h3 style="font-family:var(--font-heading);margin-bottom:1rem">🧾 Transaction Ledger</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Ref Code</th>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="client-transaction-ledger">
+                    <tr><td colspan="5" style="text-align:center;color:var(--text-secondary)">Syncing ledger...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:1.5rem">
+            <!-- Top Up Virtual Credits Panel -->
+            <article class="glass card glowing-wallet">
+              <h3 style="font-family:var(--font-heading);color:var(--accent);margin-bottom:0.25rem">💰 Top Up Credits</h3>
+              <p style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:1.25rem">Instantly add virtual credits to fund project hires.</p>
+              
+              <div style="margin-bottom:1rem">
+                <label style="font-size:0.75rem;color:var(--text-secondary);display:block;margin-bottom:0.4rem">Select Quick Amount:</label>
+                <div style="display:flex;gap:0.4rem;flex-wrap:wrap">
+                  <button class="fund-quick-btn" onclick="setTopUpAmount(100)">$100</button>
+                  <button class="fund-quick-btn" onclick="setTopUpAmount(500)">$500</button>
+                  <button class="fund-quick-btn" onclick="setTopUpAmount(1000)">$1000</button>
+                  <button class="fund-quick-btn" onclick="setTopUpAmount(2500)">$2500</button>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:0.5rem;margin-bottom:1.25rem">
+                <input type="number" id="topup-amount-input" class="form-control" placeholder="Custom Amount" min="1" max="5000" style="background:rgba(0,0,0,0.3)">
+                <button onclick="executeTopUp()" class="btn btn-primary">Deposit</button>
+              </div>
+            </article>
+
+            <!-- Spending Analytics Chart -->
+            <article class="glass card" style="padding:1.25rem">
+              <h3 style="font-family:var(--font-heading);margin-bottom:1rem">📊 Spending Analytics</h3>
+              <div style="height:200px;position:relative">
+                <canvas id="client-spend-chart"></canvas>
+              </div>
+            </article>
+
+            <!-- How Escrow Operates Info -->
+            <article class="glass card" style="background:rgba(255,255,255,0.01)">
+              <h4 style="font-size:0.85rem;margin-bottom:0.5rem">🔒 Virtual Escrow Security</h4>
+              <div style="font-size:0.75rem;color:var(--text-secondary);line-height:1.5">
+                <p style="margin-bottom:0.5rem"><strong>1. Hire:</strong> Budget locked from available balance.</p>
+                <p style="margin-bottom:0.5rem"><strong>2. Develop:</strong> Funds protected until milestones complete.</p>
+                <p><strong>3. Disburse:</strong> One-click release transfers credits to student's earnings.</p>
+              </div>
+            </article>
+          </div>
+
+        </div>
+      `;
+
+      let spendChart = null;
+
+      // Quick amount helper
+      window.setTopUpAmount = function(amount) {
+        document.getElementById('topup-amount-input').value = amount;
+      };
+
+      // Top up trigger
+      window.executeTopUp = function() {
+        const input = document.getElementById('topup-amount-input');
+        const amount = parseFloat(input.value);
+
+        if (!amount || amount <= 0 || amount > 5000) {
+          showToast('Please enter a valid amount between $1 and $5000.', 'warning');
+          return;
+        }
+
+        API.post('/wallet/add-funds', { amount }).then(res => {
+          showToast('💰 Virtual credits added successfully!', 'success');
+          input.value = '';
+          loadWalletDesk();
+        }).catch(err => {
+          showToast('Deposit failed: ' + err.message, 'error');
+        });
+      };
+
+      // Release Escrow trigger
+      window.releaseProjectEscrow = function(projectId) {
+        if (!confirm('💸 Confirm release of escrow funds? Student earnings will be updated immediately.')) return;
+
+        API.post('/payments/release', { project_id: projectId }).then(() => {
+          showToast('🎉 Escrow payout released successfully!', 'success');
+          loadWalletDesk();
+        }).catch(err => {
+          showToast('Escrow release failed: ' + err.message, 'error');
+        });
+      };
+
+      // Revert/Refund Escrow trigger
+      window.refundProjectEscrow = function(projectId) {
+        if (!confirm('💥 Cancel project campaign and refund active escrow back to your available balance?')) return;
+
+        API.post('/payments/refund', { project_id: projectId }).then(() => {
+          showToast('↩️ Escrow contract cancelled. Balance returned.', 'info');
+          loadWalletDesk();
+        }).catch(err => {
+          showToast('Refund failed: ' + err.message, 'error');
+        });
+      };
+
+      function renderSpendAnalytics(txs) {
+        const ctx = document.getElementById('client-spend-chart').getContext('2d');
+        
+        // Sum spending by transaction type
+        const spending = {
+          escrow_locks: 0,
+          escrow_releases: 0,
+          deposits: 0
+        };
+
+        txs.forEach(t => {
+          if (t.type === 'escrow_lock') spending.escrow_locks += t.amount;
+          else if (t.type === 'escrow_release') spending.escrow_releases += t.amount;
+          else if (t.type === 'deposit') spending.deposits += t.amount;
+        });
+
+        if (spendChart) {
+          spendChart.destroy();
+        }
+
+        // Wait for chart script to fully load
+        if (typeof Chart === 'undefined') {
+          setTimeout(() => renderSpendAnalytics(txs), 500);
+          return;
+        }
+
+        spendChart = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Deposits', 'Locked', 'Released'],
+            datasets: [{
+              data: [spending.deposits, spending.escrow_locks, spending.escrow_releases],
+              backgroundColor: ['#2dd4bf', '#f59e0b', '#10b981'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { color: '#94a3b8', font: { family: 'inherit', size: 10 } }
+              }
+            }
+          }
+        });
+      }
+
+      function loadWalletDesk() {
+        Promise.all([
+          API.get('/wallet/balance'),
+          API.get('/payments/history')
+        ]).then(([bal, history]) => {
+          const w = bal.wallet;
+          
+          // Render stats cards
+          document.getElementById('client-stats-row').innerHTML = `
+            <article class="glass stat-card" style="border-left:4px solid var(--accent)">
+              <span class="label">💳 Available Balance</span>
+              <span class="value" style="color:var(--accent)" id="client-wallet-bal">$${w.balance.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+            </article>
+            <article class="glass stat-card" style="border-left:4px solid #f59e0b">
+              <span class="label">🔒 Locked Escrow</span>
+              <span class="value" style="color:#f59e0b">$${w.pending_balance.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+            </article>
+            <article class="glass stat-card" style="border-left:4px solid #10b981">
+              <span class="label">📈 Lifetime Spend</span>
+              <span class="value" style="color:#10b981">$${w.total_spent.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+            </article>
+          `;
+
+          // Render active escrows list
+          const activeEscrows = history.escrows.filter(e => e.status === 'Escrowed');
+          const escrowList = document.getElementById('escrow-contracts-list');
+          
+          if (activeEscrows.length === 0) {
+            escrowList.innerHTML = `
+              <div style="padding:1.5rem;text-align:center;color:var(--text-secondary)">
+                <p>No active locked escrows.</p>
+              </div>
+            `;
+          } else {
+            escrowList.innerHTML = activeEscrows.map(e => `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:var(--radius-md)">
+                <div>
+                  <h4 style="font-size:0.88rem;font-weight:700">${e.project_title}</h4>
+                  <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.15rem">Hired Student: <strong>${e.freelancer_name}</strong></div>
+                  <div style="font-size:0.85rem;color:var(--accent);font-weight:700;margin-top:0.25rem">$${e.amount.toLocaleString()} Cr</div>
+                </div>
+                <div style="display:flex;gap:0.4rem">
+                  <button onclick="releaseProjectEscrow(${e.project_id})" class="btn btn-primary btn-sm">💸 Release Payout</button>
+                  <button onclick="refundProjectEscrow(${e.project_id})" class="btn btn-ghost btn-sm" style="color:var(--danger)">Refund</button>
+                </div>
+              </div>
+            `).join('');
+          }
+
+          // Render transaction ledger
+          const ledger = document.getElementById('client-transaction-ledger');
+          if (history.transactions.length === 0) {
+            ledger.innerHTML = `
+              <tr>
+                <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-secondary)">No financial transactions registered.</td>
+              </tr>
+            `;
+          } else {
+            ledger.innerHTML = history.transactions.map(t => {
+              let typeBadge = '';
+              if (t.type === 'deposit') typeBadge = '<span class="badge badge-success">DEPOSIT</span>';
+              else if (t.type === 'escrow_lock') typeBadge = '<span class="badge badge-warning">ESCROW LOCK</span>';
+              else if (t.type === 'escrow_release') typeBadge = '<span class="badge badge-success">PAYOUT</span>';
+              else if (t.type === 'refund') typeBadge = '<span class="badge badge-info">REFUND</span>';
+
+              const amountColor = t.type === 'deposit' || t.type === 'refund' ? 'var(--success)' : 'var(--danger)';
+              const prefix = t.type === 'deposit' || t.type === 'refund' ? '+' : '-';
+
+              return `
+                <tr>
+                  <td style="font-family:monospace;font-size:0.8rem">${t.reference_code}</td>
+                  <td style="font-size:0.8rem;color:var(--text-secondary)">${new Date(t.created_at).toLocaleDateString()} ${new Date(t.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</td>
+                  <td>${typeBadge}</td>
+                  <td style="font-weight:900;color:${amountColor}">${prefix}$${t.amount.toFixed(2)}</td>
+                  <td style="font-size:0.8rem;text-transform:capitalize">${t.status}</td>
+                </tr>
+              `;
+            }).join('');
+          }
+
+          // Render doughnut spend chart
+          renderSpendAnalytics(history.transactions);
+
+        }).catch(err => {
+          showToast('Balance fetch failed: ' + err.message, 'error');
+        });
+      }
+
+      loadWalletDesk();
+
+      // Listen for dynamic WebSockets changes
+      const sock = initSocket();
+      if (sock) {
+        sock.on('wallet_updated', (data) => {
+          // Trigger neon glow flash update
+          const balEl = document.getElementById('client-wallet-bal');
+          if (balEl) {
+            balEl.style.transition = 'text-shadow 0.3s ease';
+            balEl.style.textShadow = '0 0 15px var(--accent)';
+            setTimeout(() => {
+              balEl.style.textShadow = 'none';
+            }, 800);
+          }
+          loadWalletDesk();
+        });
+        
+        sock.on('payment_notification', (data) => {
+          showToast(`💰 Payment Alert: ${data.title} - ${data.message}`, 'info');
+        });
+      }
+    });
+  </script>
+</body>
+</html>

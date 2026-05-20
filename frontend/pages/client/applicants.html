@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Applicants | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+  <script>
+    initDashboard('client', 'applicants', 'Applicants', function(el) {
+      el.innerHTML = `<div id="al" class="grid grid-2" style="gap:1rem"><div class="skeleton" style="height:130px;border-radius:var(--radius-lg)"></div></div>`;
+
+      const al = document.getElementById('al');
+      const pid = new URLSearchParams(location.search).get('project');
+
+      if (!pid) {
+        al.innerHTML = `
+          <div class="glass card" style="grid-column:1/-1;text-align:center;padding:2.5rem">
+            <p style="color:var(--text-secondary);font-size:.88rem">Select a project first.</p>
+            <a href="manage-projects.html" class="btn btn-primary btn-sm" style="margin-top:1rem">Manage Projects</a>
+          </div>`;
+        return;
+      }
+
+      async function load() {
+        try {
+          const apps = await API.get(`/projects/${pid}/applications`);
+          if (!apps.length) {
+            al.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text-secondary);padding:2rem">No applications yet.</p>';
+            return;
+          }
+
+          al.innerHTML = apps.map(a => {
+            const bid = a.proposed_rate ? formatMoney(a.proposed_rate) : 'Standard';
+            let status = '';
+            if (a.status === 'accepted') {
+              status = `
+                <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.75rem">
+                  <span class="badge" style="background:rgba(16,185,129,.12);color:var(--success)">Hired</span>
+                  <a href="workspace.html?project=${pid}" class="btn btn-primary btn-sm" style="font-size:.72rem">Open Workspace</a>
+                </div>`;
+            } else if (a.status === 'rejected') {
+              status = '<span class="badge" style="background:rgba(239,68,68,.12);color:var(--danger);margin-top:.75rem;display:inline-block">Declined</span>';
+            } else {
+              status = `
+                <div style="display:flex;gap:.4rem;margin-top:.75rem">
+                  <button class="btn btn-primary btn-sm accept-btn" data-id="${a.id}" style="font-size:.75rem">Hire</button>
+                  <button class="btn btn-ghost btn-sm reject-btn" data-id="${a.id}" style="font-size:.75rem">Decline</button>
+                </div>`;
+            }
+
+            return `
+              <article class="glass card" style="padding:1.25rem;display:flex;flex-direction:column">
+                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.5rem">
+                  <h3 style="font-size:.95rem;margin:0">${a.applicant_name}</h3>
+                  <span style="font-weight:700;color:var(--success);font-size:.9rem">${bid}</span>
+                </div>
+                <p style="font-size:.82rem;color:var(--text-secondary);line-height:1.45;flex:1">${a.cover_letter}</p>
+                ${status}
+              </article>`;
+          }).join('');
+
+          al.querySelectorAll('.accept-btn').forEach(btn => {
+            btn.onclick = async () => {
+              if (confirm('Hire this freelancer? This will lock your project budget in escrow.')) {
+                try {
+                  await API.put(`/projects/applications/${btn.dataset.id}`, { status: 'accepted' });
+                  showToast('Freelancer hired!', 'success');
+                  load();
+                } catch (err) { showToast('Error: ' + err.message, 'error'); }
+              }
+            };
+          });
+
+          al.querySelectorAll('.reject-btn').forEach(btn => {
+            btn.onclick = async () => {
+              try {
+                await API.put(`/projects/applications/${btn.dataset.id}`, { status: 'rejected' });
+                showToast('Proposal declined', 'info');
+                load();
+              } catch (err) { showToast('Error: ' + err.message, 'error'); }
+            };
+          });
+
+        } catch (err) { showToast('Error: ' + err.message, 'error'); }
+      }
+      load();
+    });
+  </script>
+</body>
+</html>

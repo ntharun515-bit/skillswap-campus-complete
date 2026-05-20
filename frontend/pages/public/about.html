@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Us | SkillSwap</title>
+  <meta name="description" content="Learn about SkillSwap — the student-only freelance marketplace that bridges the gap between academic skills and real-world projects.">
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <style>
+    .about-hero { padding: 6rem 0 4rem; text-align: center; }
+    .about-hero h1 { font-size: clamp(2rem, 5vw, 3rem); font-weight: 900; letter-spacing: -0.03em; margin-bottom: 1rem; font-family: var(--font-heading); background: var(--gradient-hero); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .about-hero p { font-size: 1.15rem; color: var(--text-secondary); max-width: 700px; margin: 0 auto; line-height: 1.65; }
+    .mission-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
+    .mission-card { padding: 2rem; }
+    .mission-card .icon { font-size: 2rem; margin-bottom: 0.75rem; }
+    .mission-card h3 { font-size: 1.15rem; margin-bottom: 0.5rem; }
+    .mission-card p { font-size: 0.92rem; color: var(--text-secondary); line-height: 1.6; }
+    .value-item { display: flex; gap: 1.25rem; padding: 1.5rem; align-items: flex-start; }
+    .value-item .v-icon { width: 48px; height: 48px; border-radius: var(--radius-md); background: var(--accent-glow); border: 1px solid var(--accent); display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; }
+    .value-item h4 { font-size: 1.05rem; margin-bottom: 0.3rem; }
+    .value-item p { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.55; }
+    .timeline-section { margin-top: 3rem; }
+    .timeline-item { display: flex; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid var(--border); }
+    .timeline-item:last-child { border-bottom: none; }
+    .timeline-year { font-family: var(--font-heading); font-size: 1.5rem; font-weight: 800; color: var(--accent); min-width: 80px; flex-shrink: 0; }
+    .timeline-content h4 { font-size: 1rem; margin-bottom: 0.3rem; }
+    .timeline-content p { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.55; }
+  </style>
+</head>
+<body>
+  <div id="nav"></div>
+
+  <main id="main">
+    <!-- Hero -->
+    <section class="about-hero container">
+      <span class="badge" style="margin-bottom:1.25rem;display:inline-block;background:var(--accent-glow);color:var(--accent);font-weight:700;padding:0.35rem 0.9rem;border-radius:999px;border:1px solid var(--accent);font-size:0.82rem">🎓 Our Story</span>
+      <h1>Empowering Students to Earn,<br>Learn & Build — Together</h1>
+      <p>SkillSwap was born from a simple idea: every university campus is full of untapped talent — coders, designers, writers, tutors — who can help each other grow while gaining real professional experience.</p>
+    </section>
+
+    <!-- Mission & Vision -->
+    <section class="section container" style="padding: 2rem 0 4rem;">
+      <div class="mission-grid">
+        <article class="glass card mission-card">
+          <div class="icon">🎯</div>
+          <h3>Our Mission</h3>
+          <p>To create a secure, closed-campus marketplace where students can monetize their academic skills, build professional portfolios, and gain real-world freelance experience — all before graduating.</p>
+        </article>
+        <article class="glass card mission-card">
+          <div class="icon">🔭</div>
+          <h3>Our Vision</h3>
+          <p>A future where every university student enters the workforce with a verified track record of completed projects, client reviews, and earned credentials — bridging the gap between academia and industry.</p>
+        </article>
+        <article class="glass card mission-card">
+          <div class="icon">💡</div>
+          <h3>The Problem We Solve</h3>
+          <p>Traditional freelancing platforms aren't built for students. They lack trust verification, campus context, and academic-friendly workflows. SkillSwap fills that gap with peer-authenticated, escrow-protected collaboration.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Core Values -->
+    <section class="section container" style="padding: 2rem 0 4rem;">
+      <h2 style="text-align:center;font-size:1.8rem;font-weight:800;margin-bottom:2.5rem;font-family:var(--font-heading)">Our Core Values</h2>
+      <div class="grid grid-2" style="gap:1rem">
+        <article class="glass card value-item">
+          <div class="v-icon">🤝</div>
+          <div>
+            <h4>Trust First</h4>
+            <p>Every transaction is protected by smart escrow. Every freelancer can be skill-verified. Every interaction is logged. Trust isn't assumed — it's engineered.</p>
+          </div>
+        </article>
+        <article class="glass card value-item">
+          <div class="v-icon">🎓</div>
+          <div>
+            <h4>Student-Centric Design</h4>
+            <p>Built for academic schedules, campus budgets, and student skill levels. No hidden fees, no corporate gatekeeping — just peer-to-peer collaboration.</p>
+          </div>
+        </article>
+        <article class="glass card value-item">
+          <div class="v-icon">🏆</div>
+          <div>
+            <h4>Meritocratic Growth</h4>
+            <p>Your reputation is earned through completed projects, client reviews, XP milestones, and skill verifications — not bought or gamed.</p>
+          </div>
+        </article>
+        <article class="glass card value-item">
+          <div class="v-icon">🔓</div>
+          <div>
+            <h4>Radical Transparency</h4>
+            <p>Open project budgets, public reviews, visible escrow status, and full activity audit logs. Every stakeholder sees the same truth.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- What Makes Us Different -->
+    <section class="section container" style="padding: 2rem 0 4rem;">
+      <h2 style="text-align:center;font-size:1.8rem;font-weight:800;margin-bottom:1rem;font-family:var(--font-heading)">What Makes SkillSwap Different</h2>
+      <p style="text-align:center;color:var(--text-secondary);max-width:600px;margin:0 auto 2.5rem;font-size:1.05rem">We're not just another freelance marketplace. Here's how we compare.</p>
+      <div class="glass card" style="overflow-x:auto">
+        <table style="width:100%;min-width:500px">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:1rem">Feature</th>
+              <th style="text-align:center;padding:1rem;color:var(--accent);font-weight:800">SkillSwap</th>
+              <th style="text-align:center;padding:1rem">Traditional Platforms</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="padding:0.75rem 1rem">Campus-Only Verified Peers</td><td style="text-align:center">✅</td><td style="text-align:center">❌</td></tr>
+            <tr><td style="padding:0.75rem 1rem">Built-in Smart Escrow</td><td style="text-align:center">✅</td><td style="text-align:center">⚠️ Limited</td></tr>
+            <tr><td style="padding:0.75rem 1rem">AI Project-Skill Matching</td><td style="text-align:center">✅</td><td style="text-align:center">❌</td></tr>
+            <tr><td style="padding:0.75rem 1rem">Integrated Kanban Workspace</td><td style="text-align:center">✅</td><td style="text-align:center">❌</td></tr>
+            <tr><td style="padding:0.75rem 1rem">Real-Time Socket.IO Chat</td><td style="text-align:center">✅</td><td style="text-align:center">✅</td></tr>
+            <tr><td style="padding:0.75rem 1rem">Gamified XP & Badges</td><td style="text-align:center">✅</td><td style="text-align:center">❌</td></tr>
+            <tr><td style="padding:0.75rem 1rem">Skill Verification Quizzes</td><td style="text-align:center">✅</td><td style="text-align:center">❌</td></tr>
+            <tr><td style="padding:0.75rem 1rem">Zero Platform Fees</td><td style="text-align:center">✅</td><td style="text-align:center">❌ (20%+ cut)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Platform Journey Timeline -->
+    <section class="section container" style="padding: 2rem 0 5rem;">
+      <h2 style="text-align:center;font-size:1.8rem;font-weight:800;margin-bottom:1rem;font-family:var(--font-heading)">Our Journey</h2>
+      <div class="glass card" style="padding:2rem;max-width:700px;margin:0 auto">
+        <div class="timeline-item">
+          <div class="timeline-year">2025</div>
+          <div class="timeline-content">
+            <h4>🌱 Concept & Prototype</h4>
+            <p>Idea born during a university hackathon. First prototype built with Flask, SQLAlchemy, and vanilla JavaScript.</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-year">2026</div>
+          <div class="timeline-content">
+            <h4>🚀 Platform Launch</h4>
+            <p>Full-stack SaaS launch with AI matching, real-time chat, escrow payments, gamification engine, and admin controls.</p>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-year">2026+</div>
+          <div class="timeline-content">
+            <h4>🔮 What's Next</h4>
+            <p>Multi-campus federation, blockchain-backed credential verification, mobile apps, and employer talent pipeline integrations.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="footer"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script>
+    document.getElementById('nav').innerHTML = renderNavbar('about');
+    document.getElementById('footer').innerHTML = renderFooter();
+  </script>
+</body>
+</html>

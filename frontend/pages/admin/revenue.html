@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administrative Payments Desk | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  <style>
+    .admin-danger-btn {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #ef4444 !important;
+    }
+    .admin-danger-btn:hover {
+      background: #ef4444;
+      color: #000 !important;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('admin', 'revenue', 'Revenue', function(el) {
+      el.innerHTML = `
+        <!-- Administrative Stats Grid -->
+        <div class="stats-grid" id="admin-stats-row">
+          <div class="glass card skeleton" style="height:110px"></div>
+          <div class="glass card skeleton" style="height:110px"></div>
+          <div class="glass card skeleton" style="height:110px"></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:1.5rem;margin-top:1.5rem">
+          
+          <div style="display:flex;flex-direction:column;gap:1.5rem">
+            <!-- Pending Withdrawal Payouts Grid -->
+            <article class="glass card">
+              <h3 style="font-family:var(--font-heading);margin-bottom:1rem">💸 Pending Withdrawal Approval Queue</h3>
+              <div id="pending-withdrawals-queue-list" style="display:flex;flex-direction:column;gap:0.75rem">
+                <div class="skeleton" style="height:65px"></div>
+              </div>
+            </article>
+
+            <!-- Complete Platform Ledger -->
+            <article class="glass card">
+              <h3 style="font-family:var(--font-heading);margin-bottom:1rem">🧾 Platform Ledger (Recent 20)</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Ref Code</th>
+                      <th>Sender</th>
+                      <th>Receiver</th>
+                      <th>Amount</th>
+                      <th>Type</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="admin-platform-ledger-tbody">
+                    <tr><td colspan="6" style="text-align:center;color:var(--text-secondary)">Syncing ledger...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:1.5rem">
+            <!-- Platform Escrow Volume Charts -->
+            <article class="glass card" style="padding:1.25rem">
+              <h3 style="font-family:var(--font-heading);margin-bottom:1rem">📊 Platform Volume Ratio</h3>
+              <div style="height:220px;position:relative">
+                <canvas id="admin-escrow-payout-chart"></canvas>
+              </div>
+            </article>
+
+            <!-- Administrative Financial Moderation Guide -->
+            <article class="glass card" style="background:rgba(255,255,255,0.01)">
+              <h4 style="font-size:0.85rem;margin-bottom:0.5rem">⚖️ Payout Approval Procedures</h4>
+              <div style="font-size:0.75rem;color:var(--text-secondary);line-height:1.5">
+                <p style="margin-bottom:0.5rem">✔️ Ensure that the recipient developer has completed deliverables prior to release approval.</p>
+                <p style="margin-bottom:0.5rem">✔️ Rejecting a withdrawal immediately returns blocked pending payout credits to the student's available available balance.</p>
+                <p>✔️ Platform ledger records are legally auditable and fully immutable.</p>
+              </div>
+            </article>
+          </div>
+
+        </div>
+      `;
+
+      let adminChart = null;
+
+      // Manual Approve Withdrawal payout
+      window.approvePayoutRequest = function(reqId) {
+        API.post(`/admin/withdrawals/${reqId}/approve`).then(() => {
+          showToast('🎉 Withdrawal successfully approved and disbursed!', 'success');
+          loadAdminRevenueDesk();
+        }).catch(err => {
+          showToast('Approval failed: ' + err.message, 'error');
+        });
+      };
+
+      // Manual Reject Withdrawal payout
+      window.rejectPayoutRequest = function(reqId) {
+        const reason = 'Administrative compliance verification.';
+        API.post(`/admin/withdrawals/${reqId}/reject`, { reason: reason }).then(() => {
+          showToast('Withdrawal declined. Credits reverted to student balance.', 'info');
+          loadAdminRevenueDesk();
+        }).catch(err => {
+          showToast('Rejection failed: ' + err.message, 'error');
+        });
+      };
+
+      function renderAdminChart(stats) {
+        const ctx = document.getElementById('admin-escrow-payout-chart').getContext('2d');
+        
+        if (adminChart) {
+          adminChart.destroy();
+        }
+
+        if (typeof Chart === 'undefined') {
+          setTimeout(() => renderAdminChart(stats), 500);
+          return;
+        }
+
+        adminChart = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Locked Escrow Volume', 'Released Platform Volume'],
+            datasets: [{
+              data: [stats.total_escrowed, stats.total_released],
+              backgroundColor: ['#f59e0b', '#2dd4bf'],
+              borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { color: '#94a3b8', font: { size: 10 } }
+              }
+            }
+          }
+        });
+      }
+
+      function loadAdminRevenueDesk() {
+        API.get('/admin/withdrawals').then(data => {
+          
+          // Render stats cards
+          document.getElementById('admin-stats-row').innerHTML = `
+            <article class="glass stat-card" style="border-left:4px solid #f59e0b">
+              <span class="label">🔒 Locked Platform Escrow</span>
+              <span class="value" style="color:#f59e0b">$${data.escrow_statistics.total_escrowed.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+            </article>
+            <article class="glass stat-card" style="border-left:4px solid var(--accent)">
+              <span class="label">💸 Cleared Disbursements</span>
+              <span class="value" style="color:var(--accent)">$${data.escrow_statistics.total_released.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+            </article>
+            <article class="glass stat-card" style="border-left:4px solid #ef4444">
+              <span class="label">⏳ Pending Payout Queue</span>
+              <span class="value" style="color:#ef4444">${data.withdrawals.filter(w => w.status === 'pending').length} Requests</span>
+            </article>
+          `;
+
+          // Render pending withdrawals list
+          const pending = data.withdrawals.filter(w => w.status === 'pending');
+          const queue = document.getElementById('pending-withdrawals-queue-list');
+          
+          if (pending.length === 0) {
+            queue.innerHTML = `
+              <div style="padding:2rem;text-align:center;color:var(--text-secondary)">
+                <p>No pending withdrawal payout requests in queue.</p>
+              </div>
+            `;
+          } else {
+            queue.innerHTML = pending.map(w => `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:var(--radius-md)">
+                <div>
+                  <h4 style="font-size:0.88rem;font-weight:700">${w.user_name}</h4>
+                  <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.15rem">Method: <strong>${w.method}</strong> · Filed: ${new Date(w.requested_at).toLocaleDateString()}</div>
+                  <div style="font-size:0.9rem;color:var(--accent);font-weight:700;margin-top:0.25rem">$${w.amount.toLocaleString()} Cr</div>
+                </div>
+                <div style="display:flex;gap:0.4rem">
+                  <button onclick="approvePayoutRequest(${w.id})" class="btn btn-primary btn-sm">✔️ Approve</button>
+                  <button onclick="rejectPayoutRequest(${w.id})" class="btn btn-ghost btn-sm admin-danger-btn">Decline</button>
+                </div>
+              </div>
+            `).join('');
+          }
+
+          // Render platform ledger
+          const ledger = document.getElementById('admin-platform-ledger-tbody');
+          if (data.all_transactions.length === 0) {
+            ledger.innerHTML = `
+              <tr>
+                <td colspan="6" style="text-align:center;padding:2rem;color:var(--text-secondary)">No ledger records exist on the platform.</td>
+              </tr>
+            `;
+          } else {
+            ledger.innerHTML = data.all_transactions.map(t => {
+              let typeBadge = '';
+              if (t.type === 'deposit') typeBadge = '<span class="badge badge-success">DEPOSIT</span>';
+              else if (t.type === 'escrow_lock') typeBadge = '<span class="badge badge-warning">ESCROW LOCK</span>';
+              else if (t.type === 'escrow_release') typeBadge = '<span class="badge badge-success">PAYOUT</span>';
+              else if (t.type === 'withdrawal') typeBadge = '<span class="badge badge-danger">WITHDRAWAL</span>';
+              else if (t.type === 'refund') typeBadge = '<span class="badge badge-info">REFUND</span>';
+
+              const amountColor = t.type === 'deposit' || t.type === 'escrow_release' || t.type === 'refund' ? 'var(--success)' : 'var(--danger)';
+              const prefix = t.type === 'deposit' || t.type === 'escrow_release' || t.type === 'refund' ? '+' : '-';
+
+              return `
+                <tr>
+                  <td style="font-family:monospace;font-size:0.8rem">${t.reference_code}</td>
+                  <td style="font-size:0.8rem;color:var(--text-secondary)">${t.sender_name}</td>
+                  <td style="font-size:0.8rem;color:var(--text-secondary)">${t.receiver_name}</td>
+                  <td style="font-weight:900;color:${amountColor}">${prefix}$${t.amount.toFixed(2)}</td>
+                  <td>${typeBadge}</td>
+                  <td style="font-size:0.8rem;text-transform:capitalize">${t.status}</td>
+                </tr>
+              `;
+            }).join('');
+          }
+
+          // Render analytics charts
+          renderAdminChart(data.escrow_statistics);
+
+        }).catch(err => {
+          showToast('Administrative dashboard fetch failed: ' + err.message, 'error');
+        });
+      }
+
+      loadAdminRevenueDesk();
+
+      // Listen for administrative WebSockets updates
+      const sock = initSocket();
+      if (sock) {
+        sock.on('wallet_updated', () => loadAdminRevenueDesk());
+        sock.on('payment_notification', (data) => {
+          showToast(`⚖️ Moderation System: ${data.title} - ${data.message}`, 'info');
+          loadAdminRevenueDesk();
+        });
+      }
+    });
+  </script>
+</body>
+</html>

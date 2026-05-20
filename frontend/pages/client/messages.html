@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Messages | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <style>
+    .chat-layout {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 1.5rem;
+      height: calc(100vh - 140px);
+      max-height: 700px;
+    }
+    @media (max-width: 800px) {
+      .chat-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+    .conversation-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      overflow-y: auto;
+      padding-right: 0.5rem;
+    }
+    .conv-item-card {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.85rem 1rem;
+      border-radius: var(--radius-lg);
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition), transform var(--transition);
+    }
+    .conv-item-card:hover {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: rgba(13, 148, 136, 0.2);
+      transform: translateX(2px);
+    }
+    .conv-item-card.active {
+      background: rgba(13, 148, 136, 0.08);
+      border-color: var(--accent);
+    }
+    .chat-bubble-canvas {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 1.5rem;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 350px;
+      border-radius: var(--radius-lg);
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px solid var(--border);
+    }
+    .msg-bubble {
+      max-width: 70%;
+      padding: 0.8rem 1.1rem;
+      font-size: 0.9rem;
+      line-height: 1.45;
+      border-radius: var(--radius-lg);
+    }
+    .msg-bubble.sent {
+      align-self: flex-end;
+      background: linear-gradient(135deg, var(--accent) 0%, #6366f1 100%);
+      color: white;
+      border-bottom-right-radius: 4px;
+      box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15);
+    }
+    .msg-bubble.received {
+      align-self: flex-start;
+      background: var(--bg-glass);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('client', 'messages', 'Direct Messages', function(el) {
+      el.innerHTML = `
+        <div class="chat-layout">
+          <!-- Conversation list sidebar -->
+          <div style="display:flex;flex-direction:column;gap:0.75rem">
+            <button class="btn btn-primary" id="new-chat-btn" style="width:100%;display:flex;align-items:center;justify-content:center;gap:0.5rem;font-size:0.85rem;padding:0.75rem">
+              <span>➕</span> New Conversation
+            </button>
+            <div class="conversation-sidebar" id="cl" style="flex:1">
+              <div class="glass card skeleton" style="height:60px;margin-bottom:0.5rem"></div>
+              <div class="glass card skeleton" style="height:60px;margin-bottom:0.5rem"></div>
+            </div>
+          </div>
+
+          <!-- Active Message Window -->
+          <div class="glass card" style="display:flex;flex-direction:column;padding:1.5rem;gap:1rem;height:100%">
+            <!-- Chat Partner Header -->
+            <div style="display:flex;align-items:center;justify-content:between;border-bottom:1px solid var(--border);padding-bottom:1rem">
+              <div>
+                <h4 id="chat-partner-name" style="font-size:1.1rem;font-weight:800;color:var(--text-primary);margin:0">Open a Conversation</h4>
+                <span id="chat-partner-status" style="font-size:0.75rem;color:var(--text-secondary)">Choose an active chat from the sidebar to start messaging.</span>
+              </div>
+            </div>
+
+            <!-- Messages Window -->
+            <div id="msgs" class="chat-bubble-canvas">
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-secondary)">
+                <span style="font-size:3rem">💬</span>
+                <p style="margin-top:1rem">Your direct message stream will appear here.</p>
+              </div>
+            </div>
+
+            <!-- Message Input Area -->
+            <div style="display:flex;gap:0.75rem;border-top:1px solid var(--border);padding-top:1rem">
+              <input type="text" id="inp" placeholder="Type a secure message..." style="flex:1" disabled>
+              <button class="btn btn-primary" id="send" disabled>Send Message</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- New Chat Modal Overlay -->
+        <div id="new-chat-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);backdrop-filter:blur(8px);align-items:center;justify-content:center;z-index:999">
+          <div class="glass card" style="width:100%;max-width:420px;padding:2rem;display:flex;flex-direction:column;gap:1.25rem">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <h3 style="font-size:1.15rem;margin:0">Start a Conversation</h3>
+              <button class="btn btn-ghost btn-sm" id="close-modal-btn" style="font-size:1.2rem;padding:0.2rem 0.5rem;border:none;background:none;color:var(--text-secondary);cursor:pointer">×</button>
+            </div>
+            <div>
+              <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:0.4rem">Select Campus Member</label>
+              <select id="user-select" style="width:100%;background:var(--bg-primary);border:1px solid var(--border);color:var(--text-primary);padding:0.6rem;border-radius:var(--radius-md);outline:none">
+                <option value="">Loading campus members...</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" id="start-convo-btn" style="width:100%">Open Chat Thread</button>
+          </div>
+        </div>
+      `;
+
+      const cl = document.getElementById('cl');
+      const msgs = document.getElementById('msgs');
+      const inp = document.getElementById('inp');
+      const send = document.getElementById('send');
+      
+      const partnerName = document.getElementById('chat-partner-name');
+      const partnerStatus = document.getElementById('chat-partner-status');
+
+      const newChatBtn = document.getElementById('new-chat-btn');
+      const newChatModal = document.getElementById('new-chat-modal');
+      const closeModalBtn = document.getElementById('close-modal-btn');
+      const userSelect = document.getElementById('user-select');
+      const startConvoBtn = document.getElementById('start-convo-btn');
+
+      let currentConvId = null;
+
+      // Modal Triggers
+      newChatBtn.onclick = async () => {
+        newChatModal.style.display = 'flex';
+        try {
+          const allUsers = await API.get('/users/all');
+          userSelect.innerHTML = allUsers.map(u => {
+            const roleLabel = u.role.charAt(0).toUpperCase() + u.role.slice(1);
+            return `<option value="${u.id}">${u.full_name} (${roleLabel} - ${u.campus})</option>`;
+          }).join('') || `<option value="">No other campus members online</option>`;
+        } catch (err) {
+          showToast('Failed to load campus directory: ' + err.message, 'error');
+        }
+      };
+
+      closeModalBtn.onclick = () => {
+        newChatModal.style.display = 'none';
+      };
+
+      startConvoBtn.onclick = async () => {
+        const val = userSelect.value;
+        if (!val) return;
+        newChatModal.style.display = 'none';
+        try {
+          const res = await API.post('/chat/conversations', { user_id: +val });
+          currentConvId = res.conversation_id;
+          await loadConversations();
+          
+          const activeCard = cl.querySelector(`[data-id="${currentConvId}"]`);
+          const name = activeCard ? activeCard.dataset.name : 'Campus Partner';
+          openConversationView(currentConvId, name);
+        } catch (err) {
+          showToast('Failed to start conversation: ' + err.message, 'error');
+        }
+      };
+
+      // Render Active Conversation Sidebar
+      async function loadConversations() {
+        try {
+          const conversations = await API.get('/chat/conversations');
+          if (conversations.length === 0) {
+            cl.innerHTML = `<p style="color:var(--text-secondary);font-size:0.85rem;text-align:center;padding-top:2rem">No active conversations.</p>`;
+            return;
+          }
+
+          cl.innerHTML = conversations.map(c => {
+            const partner = c.other_user || {};
+            const initials = (partner.full_name || 'U').split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+            const lastMsgText = c.last_message ? c.last_message.content : 'No messages yet';
+            const isActive = c.id === currentConvId ? 'active' : '';
+
+            return `
+              <div class="conv-item-card ${isActive}" data-id="${c.id}" data-name="${partner.full_name || 'Campus Member'}">
+                <div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.03);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;color:var(--accent);flex-shrink:0">
+                  ${initials}
+                </div>
+                <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
+                  <strong style="font-size:0.9rem;color:var(--text-primary);display:block;margin-bottom:0.15rem">${partner.full_name || 'Campus Partner'}</strong>
+                  <span style="font-size:0.75rem;color:var(--text-secondary)">${lastMsgText.slice(0, 30)}${lastMsgText.length > 30 ? '...' : ''}</span>
+                </div>
+              </div>
+            `;
+          }).join('');
+
+          // Bind card click handlers
+          cl.querySelectorAll('.conv-item-card').forEach(card => {
+            card.onclick = () => {
+              const cid = +card.dataset.id;
+              const name = card.dataset.name;
+              openConversationView(cid, name);
+            };
+          });
+
+        } catch (err) {
+          showToast('Failed to load conversations: ' + err.message, 'error');
+        }
+      }
+
+      // Open message window for a conversation
+      async function openConversationView(cid, name) {
+        currentConvId = cid;
+        joinConversation(cid);
+        
+        partnerName.textContent = name;
+        partnerStatus.textContent = '🟢 Online & Connected';
+        
+        inp.disabled = false;
+        send.disabled = false;
+        inp.focus();
+
+        // Highlight active sidebar card
+        cl.querySelectorAll('.conv-item-card').forEach(card => {
+          if (+card.dataset.id === cid) {
+            card.classList.add('active');
+          } else {
+            card.classList.remove('active');
+          }
+        });
+
+        try {
+          const mList = await API.get(`/chat/conversations/${cid}/messages`);
+          const uid = getUser().id;
+
+          if (mList.length === 0) {
+            msgs.innerHTML = `
+              <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-secondary)">
+                <span style="font-size:2rem">👋</span>
+                <p style="margin-top:0.5rem">Start of a secure conversation thread with ${name}.</p>
+              </div>
+            `;
+            return;
+          }
+
+          msgs.innerHTML = mList.map(m => {
+            const isSent = m.sender_id === uid;
+            return `
+              <div class="msg-bubble ${isSent ? 'sent' : 'received'}">
+                ${m.content}
+              </div>
+            `;
+          }).join('');
+
+          msgs.scrollTop = msgs.scrollHeight;
+
+        } catch (err) {
+          showToast('Failed to retrieve messages: ' + err.message, 'error');
+        }
+      }
+
+      // Trigger socket submit
+      function sendMessageText() {
+        const val = inp.value.trim();
+        if (currentConvId && val) {
+          sendSocketMessage(currentConvId, val);
+          
+          // Optimistically append local chat bubble
+          const localBubble = document.createElement('div');
+          localBubble.className = 'msg-bubble sent';
+          localBubble.textContent = val;
+          msgs.appendChild(localBubble);
+          
+          msgs.scrollTop = msgs.scrollHeight;
+          inp.value = '';
+          
+          // Reload sidebar to display updated last-messages
+          loadConversations();
+        }
+      }
+
+      // Socket listener
+      onNewMessage(m => {
+        if (m.conversation_id === currentConvId) {
+          // If we received from other user, append it
+          if (m.sender_id !== getUser().id) {
+            const bubble = document.createElement('div');
+            bubble.className = 'msg-bubble received';
+            bubble.textContent = m.content;
+            msgs.appendChild(bubble);
+            msgs.scrollTop = msgs.scrollHeight;
+          }
+        }
+        loadConversations();
+      });
+
+      send.onclick = sendMessageText;
+      inp.onkeydown = e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          sendMessageText();
+        }
+      };
+
+      // Direct Message Launch Hook (?recipient_id=XXX or ?conv=YYY)
+      async function checkLaunchParameters() {
+        const params = new URLSearchParams(location.search);
+        const repId = params.get('recipient_id');
+        const convParam = params.get('conv');
+        
+        await loadConversations();
+
+        if (convParam) {
+          currentConvId = +convParam;
+          await loadConversations();
+          const activeCard = cl.querySelector(`[data-id="${currentConvId}"]`);
+          const name = activeCard ? activeCard.dataset.name : 'Campus Partner';
+          openConversationView(currentConvId, name);
+        } else if (repId) {
+          try {
+            const res = await API.post('/chat/conversations', { user_id: +repId });
+            currentConvId = res.conversation_id;
+            await loadConversations();
+            
+            const activeCard = cl.querySelector(`[data-id="${currentConvId}"]`);
+            const name = activeCard ? activeCard.dataset.name : 'Campus Partner';
+            openConversationView(currentConvId, name);
+          } catch (err) {
+            showToast('Failed to initialize conversation thread: ' + err.message, 'error');
+          }
+        }
+      }
+
+      checkLaunchParameters();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Public Profile Showcase | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <style>
+    /* Public profile specific premium layouts */
+    body {
+      background: linear-gradient(135deg, #09090b 0%, #111115 100%);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .profile-hero {
+      position: relative;
+      padding: 3.5rem 2rem 2.5rem;
+      border-radius: var(--radius-lg);
+      margin-bottom: 2rem;
+      background: radial-gradient(circle at top right, rgba(0, 242, 254, 0.08), transparent 40%), var(--bg-glass);
+      backdrop-filter: blur(var(--blur));
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 2.5rem;
+      overflow: hidden;
+    }
+    .profile-hero::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: var(--gradient-hero);
+    }
+    @media (max-width: 768px) {
+      .profile-hero {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 1.5rem;
+        padding: 2.5rem 1.5rem;
+      }
+    }
+    .avatar-large {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: var(--accent-glow);
+      border: 3px solid var(--accent);
+      box-shadow: 0 0 24px var(--accent-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      font-family: var(--font-heading);
+      font-weight: 800;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .badge-neon {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: rgba(0, 242, 254, 0.1);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 8px rgba(0, 242, 254, 0.2);
+    }
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    @media (max-width: 600px) {
+      .analytics-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .analytic-card {
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1rem;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+    .analytic-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 4px 20px rgba(0, 242, 254, 0.05);
+      transform: translateY(-2px);
+    }
+    .analytic-val {
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--accent);
+      font-family: var(--font-heading);
+      margin-bottom: 0.25rem;
+    }
+    .showcase-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+    .showcase-card {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .tech-tag {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+    .review-item {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .star-rating {
+      color: var(--warning);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  
+  <div id="nav-hook"></div>
+
+  <main class="container" style="flex:1;padding-top:2rem">
+    <div id="profile-container">
+      <div style="text-align:center;padding:5rem">
+        <div class="glass card skeleton" style="height:250px;margin-bottom:2rem"></div>
+      </div>
+    </div>
+  </main>
+
+  <div id="footer-hook"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script src="/frontend/js/socket.js"></script>
+
+  <script>
+    // Initialize common structures
+    document.getElementById('nav-hook').innerHTML = renderNavbar();
+    document.getElementById('footer-hook').innerHTML = renderFooter();
+
+    // Parse profile slug from URL pathname (matches /profile/slug or /freelancer/slug)
+    const segments = window.location.pathname.split('/');
+    const slug = segments[segments.length - 1] || 'alex-chen';
+
+    const container = document.getElementById('profile-container');
+
+    function loadPublicProfile() {
+      API.get(`/users/public/${slug}`).then(p => {
+        const u = p.user || {};
+        const freelancer = u.freelancer_profile || {};
+        
+        const avatarChar = u.full_name ? u.full_name[0].toUpperCase() : 'P';
+        const ratingAvg = freelancer.rating_avg ? freelancer.rating_avg.toFixed(1) : '4.8';
+        const completionRate = freelancer.completion_rate ? freelancer.completion_rate.toFixed(0) : '100';
+
+        container.innerHTML = `
+          <!-- Premium Profile Hero Capsule -->
+          <section class="profile-hero">
+            <div class="avatar-large">${avatarChar}</div>
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.5rem;flex-wrap:wrap">
+                <h1 style="font-size:2.2rem;font-weight:900;letter-spacing:-0.03em;margin:0;font-family:var(--font-heading)">${u.full_name}</h1>
+                <span class="badge-neon">⚡ Verified Pro</span>
+              </div>
+              <p style="font-size:1.1rem;color:var(--accent);font-weight:700;margin-bottom:0.75rem">${freelancer.headline || 'Campus Freelancer'}</p>
+              <div style="display:flex;gap:1.5rem;font-size:0.9rem;color:var(--text-secondary);flex-wrap:wrap">
+                <span>📍 Campus: <strong>${u.campus || 'MIT'}</strong></span>
+                <span>📧 Email: <strong>${u.email}</strong></span>
+                <span>💳 Rate: <strong style="color:var(--success)">${freelancer.hourly_rate || '25'} Cr / hr</strong></span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.75rem;width:100%;max-width:200px">
+              <button class="btn btn-primary" onclick="window.location.href='/frontend/pages/student/messages.html?new_user=${u.id}'">💬 Direct Message</button>
+              <button class="btn btn-ghost" onclick="compileResumeData(${u.id})">📥 Download Resume</button>
+            </div>
+          </section>
+
+          <div style="display:grid;grid-template-columns:1fr 2fr;gap:2rem;align-items:start">
+            
+            <!-- LEFT COLUMN: ABOUT, SOCIALS, ACHIEVEMENTS, REVIEWS -->
+            <div style="display:flex;flex-direction:column;gap:1.5rem">
+              
+              <!-- About Bio & Social links -->
+              <article class="glass card">
+                <h2>ℹ️ About Student</h2>
+                <p style="font-size:0.92rem;line-height:1.6;color:var(--text-secondary);margin-top:0.75rem">
+                  ${p.bio || freelancer.bio || 'This student has not written a public biography yet.'}
+                </p>
+                <div style="display:flex;gap:1rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border)">
+                  ${p.github_url ? `<a href="${p.github_url}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;font-weight:700">🐙 GitHub</a>` : ''}
+                  ${p.linkedin_url ? `<a href="${p.linkedin_url}" target="_blank" style="font-size:0.85rem;color:var(--accent);text-decoration:none;font-weight:700">💼 LinkedIn</a>` : ''}
+                </div>
+              </article>
+
+              <!-- Real-time Analytical view counters -->
+              <article class="glass card">
+                <h2>📊 Analytics & Trust</h2>
+                <div class="analytics-grid">
+                  <div class="analytic-card">
+                    <div class="analytic-val" id="portfolio-views-val">0</div>
+                    <span style="font-size:0.7rem;color:var(--text-secondary);text-transform:uppercase">Views</span>
+                  </div>
+                  <div class="analytic-card">
+                    <div class="analytic-val">${ratingAvg}</div>
+                    <span style="font-size:0.7rem;color:var(--text-secondary);text-transform:uppercase">Rating</span>
+                  </div>
+                  <div class="analytic-card">
+                    <div class="analytic-val">${completionRate}%</div>
+                    <span style="font-size:0.7rem;color:var(--text-secondary);text-transform:uppercase">Delivery</span>
+                  </div>
+                </div>
+                <div style="padding:0.75rem;background:rgba(0,242,254,0.02);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.82rem;display:flex;justify-content:between;align-items:center">
+                  <span style="color:var(--text-secondary)">AI Reliability Score</span>
+                  <strong style="color:var(--accent)">${freelancer.ai_reliability_score || 98}%</strong>
+                </div>
+              </article>
+
+              <!-- Verified Badges timeline -->
+              <article class="glass card">
+                <h2>⚡ Achievements Timeline</h2>
+                <div style="display:flex;flex-direction:column;gap:0.75rem;margin-top:1rem" id="public-achievements-list">
+                  <p style="color:var(--text-secondary);font-size:0.85rem">No verified assessment badges claimed.</p>
+                </div>
+              </article>
+
+            </div>
+
+            <!-- RIGHT COLUMN: CREATIVE PORTFOLIO SHOWCASE & REVIEWS -->
+            <div style="display:flex;flex-direction:column;gap:2rem">
+              
+              <!-- Creative Showcase Gallery -->
+              <article class="glass card" style="min-height:350px">
+                <h2>🎨 Creative Showcase Gallery</h2>
+                <p style="font-size:0.82rem;color:var(--text-secondary);margin-top:0.25rem">High fidelity projects built by the student.</p>
+                <div class="showcase-grid" id="showcase-gallery">
+                  <p style="color:var(--text-secondary);grid-column:1/-1;text-align:center;padding:3rem">No showcases uploaded to the public wall.</p>
+                </div>
+              </article>
+
+              <!-- Client reviews desk -->
+              <article class="glass card">
+                <h2>⭐ Client Feedback & Reviews</h2>
+                
+                <!-- Review Form -->
+                <div style="margin-top:1rem;padding:1rem;background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:var(--radius-md)" id="public-review-form-container">
+                  <h4 style="font-size:0.9rem;margin-bottom:0.5rem">Submit Direct Recommendation</h4>
+                  <div style="display:flex;gap:0.4rem;margin-bottom:0.75rem;font-size:1.1rem;color:var(--warning)" id="rating-stars-input">
+                    <span style="cursor:pointer" onclick="setRatingSelection(1)">⭐</span>
+                    <span style="cursor:pointer" onclick="setRatingSelection(2)">⭐</span>
+                    <span style="cursor:pointer" onclick="setRatingSelection(3)">⭐</span>
+                    <span style="cursor:pointer" onclick="setRatingSelection(4)">⭐</span>
+                    <span style="cursor:pointer" onclick="setRatingSelection(5)">⭐</span>
+                    <span style="font-size:0.85rem;color:var(--text-secondary);margin-left:0.5rem" id="rating-selection-label">Rating: 5/5</span>
+                  </div>
+                  <textarea id="review-comment-input" class="form-control" rows="2" placeholder="Write positive recommendation note..." style="width:100%;margin-bottom:0.75rem"></textarea>
+                  <button class="btn btn-primary btn-sm" onclick="submitPublicProfileReview()">Submit Endorsement</button>
+                </div>
+
+                <div style="display:flex;flex-direction:column;margin-top:1.5rem" id="public-reviews-list">
+                  <p style="color:var(--text-secondary);font-size:0.85rem;padding:1.5rem;text-align:center">No reviews submitted yet.</p>
+                </div>
+              </article>
+
+            </div>
+
+          </div>
+        `;
+
+        // Start views counter ticker animation
+        animateViewsCounter(p.portfolio_views);
+
+        // Load achievements from assessments
+        API.get(`/users/${u.id}/achievements`).then(badges => {
+          const list = document.getElementById('public-achievements-list');
+          if (badges.length > 0) {
+            list.innerHTML = badges.map(b => `
+              <div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem;background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:var(--radius-sm)">
+                <span style="font-size:1.25rem">${b.badge_icon || '🏆'}</span>
+                <div>
+                  <div style="font-size:0.82rem;font-weight:700">${b.title}</div>
+                  <div style="font-size:0.72rem;color:var(--text-secondary)">${b.description}</div>
+                </div>
+              </div>
+            `).join('');
+          }
+        }).catch(() => {});
+
+        // Render Showcase Gallery
+        const gallery = document.getElementById('showcase-gallery');
+        if (p.projects && p.projects.length > 0) {
+          gallery.innerHTML = p.projects.map(item => `
+            <div class="glass card showcase-card">
+              <div style="height:120px;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--border);margin-bottom:0.75rem">
+                <img src="${item.image || '/frontend/assets/default_proj.png'}" style="width:100%;height:100%;object-fit:cover" alt="${item.title}">
+              </div>
+              <h4 style="font-size:0.98rem;font-weight:800;margin-bottom:0.25rem">${item.title}</h4>
+              <p style="font-size:0.82rem;color:var(--text-secondary);line-height:1.45;flex:1">${item.description || ''}</p>
+              
+              <div style="display:flex;gap:0.35rem;flex-wrap:wrap;margin:0.75rem 0">
+                ${(item.technologies || '').split(',').map(tag => `<span class="tech-tag">${tag.trim()}</span>`).join('')}
+              </div>
+
+              ${item.live_demo_url ? `<a href="${item.live_demo_url}" target="_blank" class="btn btn-ghost btn-sm" style="width:100%;text-align:center">🔗 Live Handoff</a>` : ''}
+            </div>
+          `).join('');
+        }
+
+        // Render Reviews
+        const reviewsContainer = document.getElementById('public-reviews-list');
+        if (p.reviews && p.reviews.length > 0) {
+          reviewsContainer.innerHTML = p.reviews.map(r => `
+            <div class="review-item">
+              <div style="flex:1">
+                <div style="display:flex;justify-content:between;margin-bottom:0.35rem">
+                  <strong>${r.reviewer_name || 'Client'}</strong>
+                  <span class="star-rating">${'⭐'.repeat(r.rating)}</span>
+                </div>
+                <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.4">${r.comment || ''}</p>
+              </div>
+            </div>
+          `).join('');
+        }
+
+      }).catch(err => {
+        container.innerHTML = `
+          <div class="glass card" style="text-align:center;padding:5rem;color:var(--danger)">
+            <span style="font-size:3rem">⚠️</span>
+            <h2>Public Profile Unreachable</h2>
+            <p style="margin-top:1rem">${err.message}</p>
+          </div>
+        `;
+      });
+    }
+
+    let selectedRating = 5;
+    function setRatingSelection(val) {
+      selectedRating = val;
+      document.getElementById('rating-selection-label').textContent = `Rating: ${val}/5`;
+    }
+
+    function submitPublicProfileReview() {
+      const comment = document.getElementById('review-comment-input').value.trim();
+      if (!comment) {
+        showToast('Review comment is required!', 'warning');
+        return;
+      }
+
+      API.post(`/users/public/${slug}/reviews`, {
+        rating: selectedRating,
+        comment: comment
+      }).then(() => {
+        showToast('Thank you! Recommendation successfully saved.', 'success');
+        document.getElementById('review-comment-input').value = '';
+        loadPublicProfile();
+      }).catch(err => {
+        showToast('Failed to submit rating: ' + err.message, 'error');
+      });
+    }
+
+    function animateViewsCounter(targetVal) {
+      const el = document.getElementById('portfolio-views-val');
+      if (!el) return;
+      let count = 0;
+      const speed = Math.ceil(targetVal / 30);
+      const timer = setInterval(() => {
+        count += speed;
+        if (count >= targetVal) {
+          el.textContent = targetVal;
+          clearInterval(timer);
+        } else {
+          el.textContent = count;
+        }
+      }, 30);
+    }
+
+    function compileResumeData(userId) {
+      showToast('Compiling ATS Resume PDF layout...', 'info');
+      API.get(`/ai/resume/compile?user_id=${userId}`).then(res => {
+        // Output resume preview as markdown compile down
+        const blob = new Blob([res.resume_markdown], { type: 'text/markdown' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${slug}-resume.md`;
+        link.click();
+        showToast('📝 Styled Resume Markdown downloaded successfully!', 'success');
+      }).catch(err => {
+        showToast('Compile failed: ' + err.message, 'error');
+      });
+    }
+
+    loadPublicProfile();
+  </script>
+
+</body>
+</html>

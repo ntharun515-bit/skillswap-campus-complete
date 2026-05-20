@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAQ | SkillSwap</title>
+  <meta name="description" content="Frequently asked questions about SkillSwap — accounts, payments, escrow, workspace, and more.">
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <style>
+    .faq-hero { padding: 5rem 0 3rem; text-align: center; }
+    .faq-hero h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 900; font-family: var(--font-heading); margin-bottom: 0.75rem; }
+    .faq-hero p { font-size: 1.05rem; color: var(--text-secondary); max-width: 550px; margin: 0 auto; }
+    .faq-category { margin-bottom: 3rem; }
+    .faq-category h2 { font-size: 1.35rem; font-weight: 800; margin-bottom: 1rem; font-family: var(--font-heading); display: flex; align-items: center; gap: 0.5rem; }
+    .faq-item { border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 0.5rem; overflow: hidden; transition: border-color 0.3s; }
+    .faq-item:hover { border-color: var(--accent); }
+    .faq-q { padding: 1rem 1.25rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 0.95rem; background: var(--bg-glass); backdrop-filter: blur(var(--blur)); user-select: none; transition: background 0.2s; }
+    .faq-q:hover { background: var(--accent-glow); }
+    .faq-q .arrow { transition: transform 0.3s; font-size: 0.85rem; color: var(--text-secondary); }
+    .faq-item.open .arrow { transform: rotate(180deg); }
+    .faq-a { padding: 0 1.25rem; max-height: 0; overflow: hidden; transition: max-height 0.35s ease, padding 0.35s ease; font-size: 0.92rem; color: var(--text-secondary); line-height: 1.65; }
+    .faq-item.open .faq-a { max-height: 300px; padding: 0 1.25rem 1.25rem; }
+    .faq-search { max-width: 500px; margin: 1.5rem auto 3rem; position: relative; }
+    .faq-search input { width: 100%; padding: 0.85rem 1.25rem 0.85rem 3rem; border-radius: var(--radius-lg); border: 1px solid var(--border); background: var(--bg-glass); color: var(--text-primary); font-size: 1rem; backdrop-filter: blur(var(--blur)); }
+    .faq-search::before { content: '🔍'; position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+  <div id="nav"></div>
+
+  <main id="main">
+    <section class="faq-hero container">
+      <h1>Frequently Asked Questions</h1>
+      <p>Everything you need to know about using SkillSwap. Can't find your answer? Reach out to us.</p>
+      <div class="faq-search">
+        <input type="text" id="faq-filter" placeholder="Search for a question..." oninput="filterFAQ(this.value)">
+      </div>
+    </section>
+
+    <section class="section container" style="padding: 0 0 5rem; max-width: 800px;" id="faq-root">
+
+      <!-- Getting Started -->
+      <div class="faq-category" data-cat="getting-started">
+        <h2>🚀 Getting Started</h2>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">What is SkillSwap? <span class="arrow">▼</span></div>
+          <div class="faq-a">SkillSwap is a closed, university-exclusive freelance marketplace. Students can offer their skills (coding, design, writing, tutoring) as services, and other students or faculty can hire them. All transactions are protected by our virtual credit escrow system.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">Who can register? <span class="arrow">▼</span></div>
+          <div class="faq-a">Anyone with a valid university email or campus affiliation can register. You choose your role during registration: <strong>Student (freelancer)</strong> — offer your skills and apply to projects, or <strong>Client</strong> — post projects and hire talent.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">Is it free to use? <span class="arrow">▼</span></div>
+          <div class="faq-a">Yes, SkillSwap is completely free with zero platform fees. Unlike traditional freelancing sites that take 20%+ commission, we don't deduct anything from your earnings. The platform runs on virtual campus credits.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">How do I complete my profile? <span class="arrow">▼</span></div>
+          <div class="faq-a">Navigate to <strong>Settings</strong> in your dashboard. Add your full name, campus, upload an avatar, write a bio, add your skills, and optionally link your GitHub/LinkedIn profiles. A complete profile gets more visibility and AI match recommendations.</div>
+        </div>
+      </div>
+
+      <!-- Projects & Hiring -->
+      <div class="faq-category" data-cat="projects">
+        <h2>💼 Projects & Hiring</h2>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">How do I post a project? <span class="arrow">▼</span></div>
+          <div class="faq-a">As a client, go to <strong>Post Project</strong> in the sidebar. Fill in the title, description, required skills, budget (in campus credits), and deadline. Once published, student freelancers can discover and apply to your project.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">How do I apply to a project? <span class="arrow">▼</span></div>
+          <div class="faq-a">As a student, browse the <strong>Projects</strong> page or check your <strong>AI Matches</strong> on the dashboard. Click "Apply" on any project, write a cover letter explaining your approach, and optionally propose a custom rate. The client will review your application.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">What happens after a client accepts my application? <span class="arrow">▼</span></div>
+          <div class="faq-a">When accepted: <strong>1)</strong> The project budget is deducted from the client's wallet and locked in escrow. <strong>2)</strong> The project status moves to "In Progress." <strong>3)</strong> Both parties gain access to the Collaborative Workspace with Kanban boards, real-time chat, file sharing, and timeline tracking. <strong>4)</strong> All other applicants are automatically notified as "Not Selected."</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">How do I submit my completed work? <span class="arrow">▼</span></div>
+          <div class="faq-a">Inside the Workspace, use the <strong>Submit Deliverables</strong> panel. Paste your deliverable URL (GitHub repo, Vercel deploy, Figma link, etc.) and write a handoff note. This changes the project status to "Submitted" and notifies the client to review your work.</div>
+        </div>
+      </div>
+
+      <!-- Payments & Escrow -->
+      <div class="faq-category" data-cat="payments">
+        <h2>💳 Payments & Escrow</h2>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">How does the escrow system work? <span class="arrow">▼</span></div>
+          <div class="faq-a">When a client hires a freelancer, the full project budget is instantly moved from their wallet into a <strong>locked escrow state</strong>. Neither party can access these funds. The credits are only released to the freelancer when the client approves the submitted work — or refunded to the client if an admin resolves a dispute in their favor.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">How do I add credits to my wallet? <span class="arrow">▼</span></div>
+          <div class="faq-a">Go to <strong>Settings → Wallet</strong> and enter a deposit amount. In this campus simulation, credits are added instantly. In a production environment, this would connect to a real payment gateway (Stripe, PayPal, etc.).</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">What if the client doesn't approve my work? <span class="arrow">▼</span></div>
+          <div class="faq-a">The client has two options: <strong>1) Request Revision</strong> — sends the project back to "In Progress" with specific notes. <strong>2) Open Dispute</strong> — files a formal dispute with evidence for admin mediation. Escrowed funds remain locked until the dispute is resolved.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">Are there any fees? <span class="arrow">▼</span></div>
+          <div class="faq-a">No. SkillSwap charges zero commission on transactions. 100% of the project budget goes to the freelancer upon work approval. This is a key differentiator from traditional platforms.</div>
+        </div>
+      </div>
+
+      <!-- Workspace & Collaboration -->
+      <div class="faq-category" data-cat="workspace">
+        <h2>🖥️ Workspace & Collaboration</h2>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">What is the Collaborative Workspace? <span class="arrow">▼</span></div>
+          <div class="faq-a">Each hired project gets a shared workspace that includes: <strong>Kanban Task Board</strong> (To Do → In Progress → Review → Done), <strong>Real-Time Project Chat</strong> with typing indicators, <strong>File & Deliverable Drawer</strong> for sharing links, <strong>Project Timeline</strong> tracking all events, <strong>Escrow Status Card</strong>, and a <strong>Submit/Review Panel</strong>.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">Can I message the other party before hiring? <span class="arrow">▼</span></div>
+          <div class="faq-a">Yes. Use the <strong>Messages</strong> page in your dashboard to start a conversation with any user. The workspace chat is specifically for project-related communication after hiring.</div>
+        </div>
+      </div>
+
+      <!-- Verification & Reputation -->
+      <div class="faq-category" data-cat="reputation">
+        <h2>🏆 Verification & Reputation</h2>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">How does skill verification work? <span class="arrow">▼</span></div>
+          <div class="faq-a">Go to <strong>Career & AI Hub → Skill Verification</strong>. Choose a topic (JavaScript, Python, UI/UX, etc.) and take a timed quiz. Score 80% or higher to earn the <strong>Verified Pro</strong> badge, +250 XP, and increased visibility in search results.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">What are XP, levels, and badges? <span class="arrow">▼</span></div>
+          <div class="faq-a">SkillSwap uses a gamified reputation system. Earn <strong>XP</strong> by completing projects, verifying skills, and maintaining streaks. As XP grows, you level up: Rookie → Skilled → Pro Freelancer → Campus Expert. <strong>Badges</strong> are unlocked for specific achievements like first completed project, high ratings, or passing verification exams.</div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-q" onclick="toggleFaq(this)">How are reviews managed? <span class="arrow">▼</span></div>
+          <div class="faq-a">After a project is completed, both the client and freelancer can leave reviews with a 1–5 star rating and written feedback. Reviews are public and directly affect the freelancer's rating average, which influences search ranking and AI match scores.</div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <div id="footer"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script>
+    document.getElementById('nav').innerHTML = renderNavbar('faq');
+    document.getElementById('footer').innerHTML = renderFooter();
+
+    function toggleFaq(el) {
+      const item = el.parentElement;
+      const wasOpen = item.classList.contains('open');
+      // Close all others
+      document.querySelectorAll('.faq-item.open').forEach(i => i.classList.remove('open'));
+      if (!wasOpen) item.classList.add('open');
+    }
+
+    function filterFAQ(query) {
+      const q = query.toLowerCase().trim();
+      document.querySelectorAll('.faq-item').forEach(item => {
+        const text = item.textContent.toLowerCase();
+        item.style.display = !q || text.includes(q) ? '' : 'none';
+      });
+      document.querySelectorAll('.faq-category').forEach(cat => {
+        const visible = cat.querySelectorAll('.faq-item[style=""], .faq-item:not([style])');
+        cat.style.display = visible.length === 0 && q ? 'none' : '';
+      });
+    }
+  </script>
+</body>
+</html>

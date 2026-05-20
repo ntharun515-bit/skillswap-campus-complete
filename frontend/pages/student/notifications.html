@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications Center | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <style>
+    .notif-card {
+      display: flex;
+      align-items: start;
+      gap: 1.25rem;
+      padding: 1.25rem;
+      margin-bottom: 0.75rem;
+      border-radius: var(--radius-lg);
+      background: var(--bg-glass);
+      border: 1px solid var(--border);
+      transition: transform var(--transition), border-color var(--transition);
+    }
+    .notif-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(13, 148, 136, 0.25);
+    }
+    .notif-card.unread {
+      border-left: 4px solid var(--accent);
+      background: rgba(13, 148, 136, 0.02);
+    }
+    .notif-icon-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('student', 'notifications', 'Notifications Center', function(el) {
+      el.innerHTML = `
+        <div style="max-width:800px;margin: 0 auto;">
+          <div style="display:flex;justify-content:between;align-items:center;margin-bottom:1.5rem">
+            <p style="color:var(--text-secondary);font-size:0.9rem;margin:0">Stay updated on your bids, verification scores, and client milestones.</p>
+            <button class="btn btn-ghost btn-sm" id="btn-read-all" style="margin-left:auto">✔️ Mark all as read</button>
+          </div>
+          
+          <div id="notifications-list">
+            <div class="glass card skeleton" style="height:80px;margin-bottom:0.75rem"></div>
+            <div class="glass card skeleton" style="height:80px;margin-bottom:0.75rem"></div>
+          </div>
+        </div>
+      `;
+
+      const listEl = document.getElementById('notifications-list');
+      const readAllBtn = document.getElementById('btn-read-all');
+
+      async function loadNotifications() {
+        try {
+          listEl.innerHTML = `
+            <div class="glass card skeleton" style="height:80px;margin-bottom:0.75rem"></div>
+            <div class="glass card skeleton" style="height:80px;margin-bottom:0.75rem"></div>
+          `;
+
+          const items = await API.get('/notifications');
+          if (items.length === 0) {
+            listEl.innerHTML = `
+              <div class="glass card" style="text-align:center;padding:4rem 2rem;">
+                <span style="font-size:3rem">🔔</span>
+                <h3 style="margin-top:1.5rem">All Caught Up!</h3>
+                <p style="color:var(--text-secondary);margin-top:0.5rem">You don't have any notifications at the moment.</p>
+              </div>
+            `;
+            return;
+          }
+
+          listEl.innerHTML = items.map(i => {
+            const isUnread = !i.is_read;
+            
+            // Choose context icon
+            let icon = '🔔';
+            let iconBg = 'rgba(255,255,255,0.03)';
+            let titleText = i.title || 'System Alert';
+
+            if (titleText.toLowerCase().includes('verified') || titleText.toLowerCase().includes('quiz')) {
+              icon = '🏅';
+              iconBg = 'rgba(13, 148, 136, 0.1)';
+            } else if (titleText.toLowerCase().includes('hired') || titleText.toLowerCase().includes('accept') || titleText.toLowerCase().includes('payment')) {
+              icon = '💼';
+              iconBg = 'rgba(16,185,129,0.1)';
+            } else if (titleText.toLowerCase().includes('message') || titleText.toLowerCase().includes('chat')) {
+              icon = '💬';
+              iconBg = 'rgba(13, 148, 136, 0.1)';
+            }
+
+            return `
+              <article class="notif-card ${isUnread ? 'unread' : ''}">
+                <div class="notif-icon-circle" style="background:${iconBg}">
+                  ${icon}
+                </div>
+                <div style="flex:1">
+                  <div style="display:flex;justify-content:between;align-items:start;margin-bottom:0.25rem">
+                    <h4 style="font-size:1rem;font-weight:700;color:var(--text-primary);margin:0">${titleText}</h4>
+                    <span style="font-size:0.75rem;color:var(--text-secondary);margin-left:auto">${formatDate(i.created_at)}</span>
+                  </div>
+                  <p style="font-size:0.88rem;color:var(--text-secondary);line-height:1.4">${i.message}</p>
+                </div>
+              </article>
+            `;
+          }).join('');
+
+        } catch (err) {
+          showToast('Failed to load notifications: ' + err.message, 'error');
+        }
+      }
+
+      readAllBtn.onclick = async () => {
+        try {
+          await API.put('/notifications/read-all', {});
+          showToast('All notifications marked as read', 'success');
+          loadNotifications();
+        } catch (err) {
+          showToast('Failed to clear alerts: ' + err.message, 'error');
+        }
+      };
+
+      loadNotifications();
+    });
+  </script>
+</body>
+</html>

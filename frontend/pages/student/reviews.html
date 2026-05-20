@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Client Reviews | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <style>
+    .rating-meter-card {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    @media (max-width: 700px) {
+      .rating-meter-card {
+        grid-template-columns: 1fr;
+      }
+    }
+    .star-rating-orange {
+      color: var(--warning);
+      font-size: 1.1rem;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+    }
+    .review-timeline-card {
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      border-radius: var(--radius-lg);
+      background: var(--bg-glass);
+      border: 1px solid var(--border);
+      transition: transform var(--transition);
+    }
+    .review-timeline-card:hover {
+      transform: translateX(4px);
+      border-color: rgba(13, 148, 136, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('student', 'reviews', 'Reputation & Reviews', function(el) {
+      el.innerHTML = `
+        <div class="rating-meter-card" id="rating-stats">
+          <div class="glass card skeleton" style="height:100px"></div>
+          <div class="glass card skeleton" style="height:100px"></div>
+          <div class="glass card skeleton" style="height:100px"></div>
+        </div>
+
+        <article class="glass card" style="min-height:350px">
+          <h3 style="font-size:1.25rem;margin-bottom:0.25rem">💬 Client Testimonials</h3>
+          <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.5rem">Review the active feedback and ratings left by your campus partners.</p>
+          
+          <div id="reviews-timeline">
+            <div class="glass card skeleton" style="height:100px;margin-bottom:1rem"></div>
+          </div>
+        </article>
+      `;
+
+      const statsEl = document.getElementById('rating-stats');
+      const timelineEl = document.getElementById('reviews-timeline');
+
+      async function loadReviews() {
+        try {
+          statsEl.innerHTML = `
+            <div class="glass card skeleton" style="height:100px"></div>
+            <div class="glass card skeleton" style="height:100px"></div>
+            <div class="glass card skeleton" style="height:100px"></div>
+          `;
+          
+          const user = await API.get('/auth/me');
+          const reviews = await API.get(`/projects/reviews/${user.id}`);
+
+          // Compute metrics
+          const totalReviews = reviews.length;
+          const avgRating = totalReviews > 0 
+            ? (reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews) 
+            : 0;
+
+          // Dynamic Recommendation Score (Ratings >= 4 stars)
+          const recommendCount = reviews.filter(r => r.rating >= 4).length;
+          const recommendRate = totalReviews > 0 
+            ? Math.round((recommendCount / totalReviews) * 100) 
+            : 0;
+
+          statsEl.innerHTML = `
+            <article class="glass stat-card">
+              <span class="label">⭐ Rating Average</span>
+              <span class="value" style="color:var(--warning)">${avgRating > 0 ? avgRating.toFixed(1) + ' / 5.0' : 'No Reviews'}</span>
+            </article>
+            <article class="glass stat-card">
+              <span class="label">👥 Total Testimonials</span>
+              <span class="value">${totalReviews} Client Reviews</span>
+            </article>
+            <article class="glass stat-card">
+              <span class="label">👍 Recommendation Rate</span>
+              <span class="value">${totalReviews > 0 ? recommendRate + '%' : '100% Expected'}</span>
+            </article>
+          `;
+
+          if (totalReviews === 0) {
+            timelineEl.innerHTML = `
+              <div style="text-align:center;padding:4rem 2rem;color:var(--text-secondary)">
+                <span style="font-size:3rem">⭐</span>
+                <p style="margin-top:1rem">No testimonials submitted yet. Complete campaigns to earn your first rating!</p>
+              </div>
+            `;
+            return;
+          }
+
+          timelineEl.innerHTML = reviews.map(r => {
+            const stars = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+            
+            return `
+              <article class="review-timeline-card">
+                <div style="display:flex;justify-content:between;align-items:start;margin-bottom:0.75rem">
+                  <div>
+                    <div class="star-rating-orange">${stars}</div>
+                    <h4 style="font-size:0.95rem;color:var(--text-primary);margin:0">Client Partner</h4>
+                  </div>
+                  <span style="font-size:0.75rem;color:var(--text-secondary);margin-left:auto">${r.created_at ? formatDate(r.created_at) : 'Completed'}</span>
+                </div>
+                
+                <blockquote style="margin:0;padding:0.75rem 1rem;border-left:2px solid var(--accent);background:rgba(255,255,255,0.01);border-radius:0 var(--radius-sm) var(--radius-sm) 0;font-size:0.9rem;line-height:1.45;color:var(--text-secondary);font-style:italic">
+                  "${r.comment || 'No written testimonial provided.'}"
+                </blockquote>
+              </article>
+            `;
+          }).join('');
+
+        } catch (err) {
+          showToast('Failed to load reputation history: ' + err.message, 'error');
+        }
+      }
+
+      loadReviews();
+    });
+  </script>
+</body>
+</html>

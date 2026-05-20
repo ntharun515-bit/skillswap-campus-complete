@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Career & AI Hub | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <style>
+    .career-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.25fr 1fr;
+      gap: 1.25rem;
+      margin-top: 1.25rem;
+    }
+    @media (max-width: 1200px) {
+      .career-grid {
+        grid-template-columns: 1fr 1.2fr;
+      }
+    }
+    @media (max-width: 800px) {
+      .career-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .career-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .sec-head {
+      font-size: .95rem;
+      font-weight: 700;
+      margin-bottom: .5rem;
+      font-family: var(--font-heading);
+      letter-spacing: -0.02em;
+    }
+    .roadmap-node {
+      flex: 1;
+      padding: .55rem .75rem;
+      text-align: center;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius-sm);
+      font-size: .78rem;
+      font-weight: 700;
+      background: rgba(139, 92, 246, 0.04);
+      min-width: 80px;
+    }
+    .roadmap-node:hover {
+      background: var(--accent-glow);
+      transform: translateY(-1px);
+    }
+    .roadmap-arrow {
+      color: var(--accent);
+      font-weight: 900;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .skill-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .45rem .7rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: .82rem;
+      background: rgba(255, 255, 255, 0.01);
+    }
+    .quiz-q-box {
+      background: var(--bg-primary);
+      padding: 1rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+      margin-top: .75rem;
+    }
+    .quiz-opts {
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+      margin-top: .75rem;
+    }
+    .quiz-opt {
+      background: rgba(255, 255, 255, .02);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: .6rem 1rem;
+      border-radius: var(--radius-sm);
+      text-align: left;
+      cursor: pointer;
+      transition: all .2s;
+      font-size: .85rem;
+    }
+    .quiz-opt:hover, .quiz-opt.sel {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+    }
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: .3rem;
+      padding: .3rem .65rem;
+      border-radius: var(--radius-sm);
+      font-size: .78rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--bg-primary);
+      transition: border-color .2s;
+    }
+    .badge-pill:hover {
+      border-color: var(--accent);
+    }
+
+    /* 🚀 10-Tool Console Grid Styles */
+    .console-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.6rem;
+    }
+    @media (max-width: 1024px) {
+      .console-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    @media (max-width: 600px) {
+      .console-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    .console-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.01);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+      outline: none;
+    }
+    .console-btn:hover {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.15);
+    }
+    .c-icon {
+      font-size: 1.25rem;
+      margin-bottom: 0.25rem;
+    }
+    .c-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 0.15rem;
+      font-family: var(--font-heading);
+      letter-spacing: -0.01em;
+      line-height: 1.1;
+    }
+    .c-status {
+      font-size: 0.6rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+  <script>
+    initDashboard('student', 'career', 'Career & AI Hub', function(el) {
+      el.innerHTML = `
+        <!-- Profile Summary Bar -->
+        <div class="stats-grid" id="career-stats"></div>
+
+        <!-- 🚀 10-Tool AI & Student Success Console -->
+        <article class="glass card" style="padding:1.25rem 1.5rem;margin-top:1.25rem;border-color:rgba(139, 92, 246, 0.2)">
+          <h3 class="sec-head" style="font-size:1.1rem;font-weight:800;letter-spacing:-0.02em;color:var(--accent);display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem">
+            <span>🚀</span> AI Hub & Student Success Console
+          </h3>
+          <p style="color:var(--text-secondary);font-size:0.78rem;margin-bottom:1rem">Access your fully integrated ecosystem of AI services, verification tools, and peer workspaces.</p>
+
+          <div class="console-grid">
+            <button class="console-btn" onclick="scrollToElement('resume-md')">
+              <span class="c-icon">📄</span>
+              <span class="c-title">AI Resume Builder</span>
+              <span class="c-status">Active</span>
+            </button>
+            <button class="console-btn" onclick="scrollToElement('quiz-room')">
+              <span class="c-icon">🎓</span>
+              <span class="c-title">AI Mock Interview</span>
+              <span class="c-status">Active</span>
+            </button>
+            <button class="console-btn" onclick="scrollToElement('idea-skill')">
+              <span class="c-icon">💡</span>
+              <span class="c-title">AI Project Generator</span>
+              <span class="c-status">Active</span>
+            </button>
+            <button class="console-btn" onclick="window.location.href='workspace.html'">
+              <span class="c-icon">🖥️</span>
+              <span class="c-title">Real-time Collaboration</span>
+              <span class="c-status">Launch</span>
+            </button>
+            <button class="console-btn" onclick="scrollToElement('roadmap-role')">
+              <span class="c-icon">🧭</span>
+              <span class="c-title">AI Skill Gap Analyzer</span>
+              <span class="c-status">Active</span>
+            </button>
+            <button class="console-btn" onclick="window.location.href='projects.html'">
+              <span class="c-icon">💼</span>
+              <span class="c-title">Internship Board</span>
+              <span class="c-status">Launch</span>
+            </button>
+            <button class="console-btn" onclick="toggleCodeAssistant()">
+              <span class="c-icon">💻</span>
+              <span class="c-title">AI Code Assistant</span>
+              <span class="c-status" style="color:var(--success)">Beta ⚡</span>
+            </button>
+            <button class="console-btn" onclick="scrollToElement('career-stats')">
+              <span class="c-icon">⭐</span>
+              <span class="c-title">Reputation System</span>
+              <span class="c-status">Active</span>
+            </button>
+            <button class="console-btn" onclick="openMentorModal()">
+              <span class="c-icon">🤝</span>
+              <span class="c-title">Mentor Connect</span>
+              <span class="c-status" style="color:var(--accent)">10 Active</span>
+            </button>
+            <button class="console-btn" onclick="openTeamMatchModal()">
+              <span class="c-icon">👥</span>
+              <span class="c-title">AI Team Matchmaking</span>
+              <span class="c-status" style="color:var(--accent)">New ✨</span>
+            </button>
+          </div>
+        </article>
+
+        <!-- Slide-open AI Code Assistant Panel -->
+        <div id="code-assistant-modal" style="display:none;margin-top:1.25rem;border-color:rgba(16,185,129,0.2)" class="glass card">
+          <div style="padding:1.25rem 1.5rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem">
+              <h4 style="font-family:var(--font-heading);font-weight:800;color:var(--success);font-size:0.95rem;display:flex;align-items:center;gap:0.4rem">
+                <span>💻 AI Code Assistant (Real-Time Code Safety Audit)</span>
+              </h4>
+              <button class="btn btn-ghost btn-sm" onclick="toggleCodeAssistant()" style="padding:0.2rem 0.5rem;font-size:0.8rem">✕</button>
+            </div>
+            <p style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:0.75rem">Input any Python or React snippet to trigger automated safety scans and structural compliance audits.</p>
+            
+            <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem">
+              <select id="code-lang" style="flex:0.3;font-size:0.78rem">
+                <option value="Python">Python</option>
+                <option value="React">React / JS</option>
+              </select>
+              <input type="text" id="code-query" placeholder="Paste your code or ask a safety query..." style="flex:0.7;font-size:0.78rem">
+              <button class="btn btn-primary btn-sm" onclick="runCodeAssistant()">Analyze</button>
+            </div>
+            
+            <div id="code-assistant-result" style="display:none;padding:0.75rem;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-primary);font-family:var(--font-mono);font-size:0.75rem;color:var(--text-secondary);max-height:150px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <div class="career-grid">
+          <!-- COLUMN 1: INTERACTIVE LEARNING & VERIFICATION -->
+          <div class="career-column">
+            <!-- 1. Student Status Ecosystem -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 class="sec-head">🏆 Student Status Ecosystem</h3>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.75rem">
+                <div style="padding:.6rem .8rem;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center">
+                  <div style="font-size:.7rem;text-transform:uppercase;color:var(--text-secondary)">Level</div>
+                  <div style="font-size:1.15rem;font-weight:800;color:var(--accent)" id="p-level">Rookie</div>
+                </div>
+                <div style="padding:.6rem .8rem;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center">
+                  <div style="font-size:.7rem;text-transform:uppercase;color:var(--text-secondary)">XP</div>
+                  <div style="font-size:1.15rem;font-weight:800" id="p-xp">0</div>
+                </div>
+              </div>
+
+              <h4 style="font-size:.82rem;margin-bottom:.35rem">Earned Badges</h4>
+              <div id="badges-list" style="display:flex;flex-wrap:wrap;gap:.35rem">
+                <span class="badge-pill" style="opacity:.5">🔒 None yet</span>
+              </div>
+
+              <h4 style="font-size:.82rem;margin-top:.75rem;margin-bottom:.35rem">Daily Missions</h4>
+              <div id="missions-list">
+                <p style="color:var(--text-secondary);font-size:.8rem">Loading...</p>
+              </div>
+            </article>
+
+            <!-- 2. Skill Verification Timed Quiz Room -->
+            <article class="glass card" style="padding:1.25rem 1.5rem" id="quiz-room">
+              <h3 class="sec-head">🎓 Skill Verification Hub</h3>
+              <p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:.75rem">Pass a timed quiz (80%+) to earn a Verified Pro Badge. Clients hire verified students first!</p>
+
+              <div id="quiz-init">
+                <div style="display:flex;gap:.6rem;align-items:end">
+                  <div style="flex:1">
+                    <label style="font-size:.78rem;font-weight:600;display:block;margin-bottom:.3rem">Topic</label>
+                    <select id="quiz-topic" style="width:100%">
+                      <option value="Python">🐍 Python / Backend API</option>
+                      <option value="React">🎨 React / Frontend UI</option>
+                      <option value="Design">🧭 UI/UX Glassmorphism</option>
+                      <option value="Database Security">🔐 Database & Security</option>
+                      <option value="Machine Learning">🧠 Machine Learning & AI</option>
+                    </select>
+                  </div>
+                  <button class="btn btn-primary btn-sm" onclick="startQuiz()">Start Quiz</button>
+                </div>
+              </div>
+
+              <div id="quiz-active" style="display:none">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:.4rem;border-bottom:1px solid var(--border)">
+                  <span id="quiz-timer" style="color:var(--danger);font-weight:800;font-size:.9rem">⏱ 60s</span>
+                  <span id="quiz-progress" style="font-size:.8rem;color:var(--text-secondary)">1/3</span>
+                </div>
+                <div class="quiz-q-box">
+                  <h4 id="quiz-q" style="font-size:.92rem;line-height:1.35">Loading...</h4>
+                  <div class="quiz-opts" id="quiz-opts"></div>
+                </div>
+                <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.75rem">
+                  <button class="btn btn-ghost btn-sm" onclick="cancelQuiz()">Cancel</button>
+                  <button class="btn btn-primary btn-sm" id="quiz-next" onclick="submitAnswer()">Next</button>
+                </div>
+              </div>
+
+              <!-- Timed Quiz Detailed Educational Review Sheet -->
+              <div id="quiz-review-box" style="display:none;margin-top:1rem;padding:0.75rem;border-radius:var(--radius-md);background:rgba(255,255,255,0.01);border:1px solid var(--border)"></div>
+            </article>
+          </div>
+
+          <!-- COLUMN 2: INTERACTIVE AI ROADMAP & LESSON PATHS -->
+          <div class="career-column">
+            <!-- 3. AI Career Roadmap Engine -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <h3 class="sec-head" style="margin-bottom:0">🧭 AI Career Roadmap</h3>
+                <select id="roadmap-role" style="width:auto;padding:.35rem .6rem;font-size:.78rem" onchange="loadRoadmap()">
+                  <option value="Full Stack Engineer">Full Stack</option>
+                  <option value="React Specialist">React Specialist</option>
+                  <option value="Data Scientist">Data Scientist</option>
+                </select>
+              </div>
+              <p id="roadmap-desc" style="font-size:.78rem;color:var(--text-secondary);margin-top:.4rem;line-height:1.4"></p>
+
+              <!-- Flowchart Interactive Nodes -->
+              <div id="roadmap-steps" style="display:flex;align-items:center;gap:.35rem;margin-top:.75rem;flex-wrap:wrap"></div>
+
+              <!-- Clickable Nodes Masterclass concepts -->
+              <div id="node-details-box" style="display:none"></div>
+
+              <!-- Skill Gaps -->
+              <h4 style="font-size:.85rem;margin-top:1.25rem;margin-bottom:.4rem">Skill Gap Analysis</h4>
+              <div id="roadmap-gaps" style="display:flex;flex-direction:column;gap:.35rem"></div>
+            </article>
+
+            <!-- 4. Recommended Campus Projects -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 class="sec-head">💼 Recommended Real-World Projects</h3>
+              <p style="font-size:.78rem;color:var(--text-secondary);margin-bottom:.6rem">Gain practical experience by bidding on campus projects that match your target roadmap skills.</p>
+              <div id="roadmap-recs" style="display:flex;flex-direction:column;gap:.35rem"></div>
+            </article>
+
+            <!-- 4.5. Trending Skills Leaderboard -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 class="sec-head" style="color:var(--accent);display:flex;align-items:center;gap:0.4rem">
+                <span>🔥</span> Campus Skill Leaderboard
+              </h3>
+              <p style="font-size:.78rem;color:var(--text-secondary);margin-bottom:0.75rem">High-demand roles and fast-growing campus skills tracking live employer hiring metrics.</p>
+              <div id="trending-skills-list" style="display:flex;flex-direction:column;gap:0.5rem">
+                <!-- Will be dynamically populated -->
+              </div>
+            </article>
+          </div>
+
+          <!-- COLUMN 3: AI DEVELOPMENT TOOLS & ANALYTICS -->
+          <div class="career-column">
+            <!-- 5. Student Project Ideas Generator -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 class="sec-head">💡 Creative Startup Idea Generator</h3>
+              <p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:.75rem">Input your core skills and generate custom Micro-SaaS startup plans to practice building!</p>
+              
+              <div style="display:flex;gap:.5rem;margin-bottom:.75rem">
+                <select id="idea-skill" style="flex:1;font-size:.8rem">
+                  <option value="Python">🐍 Python / Backend API</option>
+                  <option value="React">🎨 React / Frontend UI</option>
+                  <option value="Design">🧭 HSL UI/UX Design</option>
+                </select>
+                <button class="btn btn-primary btn-sm" onclick="generateIdea()">Generate</button>
+              </div>
+
+              <div id="idea-result" class="glass card" style="display:none;padding:1rem;border-color:rgba(16,185,129,0.2);background:rgba(16,185,129,0.02)">
+                <h4 id="idea-title" style="font-family:var(--font-heading);font-weight:800;color:var(--success);font-size:0.95rem;margin-bottom:0.4rem"></h4>
+                <p id="idea-prob" style="font-size:0.78rem;color:var(--text-secondary);line-height:1.35;margin-bottom:0.6rem"></p>
+                <div style="font-size:0.75rem;margin-bottom:0.6rem"><strong>Stack:</strong> <code id="idea-stack" style="background:rgba(255,255,255,0.05);padding:0.15rem 0.35rem;border-radius:4px;color:var(--accent)"></code></div>
+                
+                <h5 style="font-size:0.78rem;font-weight:700;margin-bottom:0.25rem">🎯 Project Milestones:</h5>
+                <ul id="idea-milestones" style="padding-left:1.15rem;font-size:0.75rem;color:var(--text-primary);line-height:1.4"></ul>
+              </div>
+            </article>
+
+            <!-- 6. AI Insights & Earning Sparklines -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 class="sec-head">📊 AI Predictive Projections</h3>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+                <div style="padding:.6rem .8rem;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center">
+                  <div style="font-size:.7rem;text-transform:uppercase;color:var(--text-secondary)">Trust Score</div>
+                  <div style="font-size:1.1rem;font-weight:800;color:var(--success)" id="ai-trust">95%</div>
+                </div>
+                <div style="padding:.6rem .8rem;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center">
+                  <div style="font-size:.7rem;text-transform:uppercase;color:var(--text-secondary)">Hire Probability</div>
+                  <div style="font-size:1.1rem;font-weight:800;color:var(--accent)" id="ai-hire">High</div>
+                </div>
+              </div>
+
+              <h4 style="font-size:.82rem;margin-top:1rem;margin-bottom:.35rem">Projected Earnings Trajectory</h4>
+              <div style="border:1px solid var(--border);border-radius:var(--radius-md);padding:.75rem;position:relative">
+                <svg width="100%" height="80" id="earnings-svg" style="overflow:visible">
+                  <defs>
+                    <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.25"/>
+                      <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+                    </linearGradient>
+                  </defs>
+                  <path id="svg-area" fill="url(#cg)"/>
+                  <path id="svg-line" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+            </article>
+
+            <!-- 7. AI Automated Professional CV -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 class="sec-head">📄 Smart Resume Compiler</h3>
+              <p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:.75rem">Compile your portfolio, badges, ratings, and verified skills into an executive Markdown CV.</p>
+              <button class="btn btn-ghost btn-sm" style="width:100%" onclick="compileResume()">Generate Resume</button>
+              <div id="resume-out" style="display:none;margin-top:.75rem">
+                <textarea id="resume-md" style="height:150px;font-family:var(--font-mono);font-size:.8rem;width:100%" readonly></textarea>
+                <div style="display:flex;gap:.4rem;margin-top:.5rem;flex-wrap:wrap">
+                  <button class="btn btn-primary btn-sm" style="flex:1" onclick="copyResume()">📋 Copy</button>
+                  <button class="btn btn-ghost btn-sm" style="flex:1" onclick="downloadResume()">💾 Export .md</button>
+                  <button class="btn btn-outline btn-sm" style="flex:1;border-color:var(--accent);color:var(--accent)" onclick="exportResumePDF()">📥 Export PDF</button>
+                </div>
+              </div>
+            </article>
+
+            <!-- 8. AI Resume & ATS compatibility Analyzer -->
+            <article class="glass card" style="padding:1.25rem 1.5rem;margin-top:1.25rem">
+              <h3 class="sec-head" style="color:var(--accent)">🔬 AI Resume & ATS Analyzer</h3>
+              <p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:.75rem">Scan your generated resume against machine-learning ATS filters to isolate keyword gaps and syntax scores.</p>
+              
+              <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:0.75rem">
+                <label style="font-size:.72rem;font-weight:700">Target Role</label>
+                <select id="analysis-role" style="width:100%;font-size:.78rem">
+                  <option value="Full Stack Engineer">Full Stack Engineer</option>
+                  <option value="React Specialist">React Specialist</option>
+                  <option value="Data Scientist">Data Scientist</option>
+                </select>
+              </div>
+
+              <button class="btn btn-primary btn-sm" style="width:100%" onclick="runResumeAnalyzer()">Run AI Resume Scan</button>
+              
+              <div id="analyzer-out" style="display:none;margin-top:0.75rem;padding:0.75rem;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-primary)">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem">
+                  <div style="padding:.5rem;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center">
+                    <div style="font-size:.65rem;text-transform:uppercase;color:var(--text-secondary)">ATS Score</div>
+                    <div style="font-size:1.1rem;font-weight:800;color:var(--accent)" id="ats-score">0%</div>
+                  </div>
+                  <div style="padding:.5rem;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center">
+                    <div style="font-size:.65rem;text-transform:uppercase;color:var(--text-secondary)">Grammar Score</div>
+                    <div style="font-size:1.1rem;font-weight:800;color:var(--success)" id="grammar-score">0%</div>
+                  </div>
+                </div>
+
+                <h4 style="font-size:0.78rem;font-weight:700;margin-bottom:0.25rem">🚫 Grammar & Tone:</h4>
+                <ul id="grammar-issues-list" style="padding-left:1.15rem;font-size:0.72rem;color:var(--text-primary);margin-bottom:0.6rem;line-height:1.4"></ul>
+
+                <h4 style="font-size:0.78rem;font-weight:700;margin-bottom:0.25rem">🧩 Missing Keyword Gaps:</h4>
+                <div id="missing-skills-tags" style="display:flex;flex-wrap:wrap;gap:0.25rem;margin-bottom:0.6rem"></div>
+
+                <h4 style="font-size:0.78rem;font-weight:700;margin-bottom:0.25rem">💡 AI Improvement Checklist:</h4>
+                <ul id="improvements-list" style="padding-left:1.15rem;font-size:0.72rem;color:var(--text-secondary);line-height:1.4"></ul>
+              </div>
+            </article>
+
+            <!-- 9. AI Portfolio Scorer & ATS Evaluator -->
+            <article class="glass card" style="padding:1.25rem 1.5rem;margin-top:1.25rem">
+              <h3 class="sec-head" style="color:var(--accent)">🏆 AI Portfolio & Profile Evaluator</h3>
+              <p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:.75rem">Scan your verified SkillSwap portfolio items, review stars, and skill badges to calculate your Match Score.</p>
+              
+              <button class="btn btn-primary btn-sm" style="width:100%" onclick="runPortfolioScorer()">Evaluate Portfolio Score</button>
+              
+              <div id="portfolio-score-out" style="display:none;margin-top:0.75rem;padding:0.75rem;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-primary)">
+                <div style="text-align:center;margin-bottom:0.75rem">
+                  <div style="font-size:.7rem;text-transform:uppercase;color:var(--text-secondary)">Ecosystem Match Score</div>
+                  <div style="font-size:1.8rem;font-weight:900;color:var(--accent)" id="port-match-score">0/100</div>
+                </div>
+                
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.75rem">
+                  <div style="padding:.4rem;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center">
+                    <div style="font-size:.65rem;color:var(--text-secondary)">Projects</div>
+                    <div style="font-size:0.9rem;font-weight:800;color:var(--text-primary)" id="port-count">0</div>
+                  </div>
+                  <div style="padding:.4rem;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center">
+                    <div style="font-size:.65rem;color:var(--text-secondary)">Rating</div>
+                    <div style="font-size:0.9rem;font-weight:800;color:var(--success)" id="port-rating">0.0</div>
+                  </div>
+                  <div style="padding:.4rem;border:1px solid var(--border);border-radius:var(--radius-sm);text-align:center">
+                    <div style="font-size:.65rem;color:var(--text-secondary)">Skills</div>
+                    <div style="font-size:0.9rem;font-weight:800;color:var(--text-primary)" id="port-skills">0</div>
+                  </div>
+                </div>
+
+                <h4 style="font-size:0.78rem;font-weight:700;margin-bottom:0.25rem;color:var(--success)">✅ Strengths:</h4>
+                <ul id="port-positives-list" style="padding-left:1.15rem;font-size:0.72rem;color:var(--text-primary);margin-bottom:0.6rem;line-height:1.4"></ul>
+
+                <h4 style="font-size:0.78rem;font-weight:700;margin-bottom:0.25rem;color:var(--warning)">💡 Recommended Upgrades:</h4>
+                <ul id="port-improvements-list" style="padding-left:1.15rem;font-size:0.72rem;color:var(--text-secondary);line-height:1.4"></ul>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <!-- 🤝 Mentor Connect Modal -->
+        <div id="mentor-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(3,7,18,0.85);z-index:9999;align-items:center;justify-content:center;padding:1.5rem">
+          <div class="glass card" style="width:100%;max-width:440px;padding:1.5rem;position:relative">
+            <h4 style="font-family:var(--font-heading);font-weight:800;color:var(--accent);font-size:1rem;margin-bottom:0.5rem;display:flex;justify-content:space-between;align-items:center">
+              <span>🤝 Peer Mentor Connect</span>
+              <button onclick="closeMentorModal()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:1.1rem;outline:none">✕</button>
+            </h4>
+            <p style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:1rem">Schedule synchronous collaboration or 1-on-1 career assistance session with verified experts on campus.</p>
+            
+            <div style="display:flex;flex-direction:column;gap:0.5rem;max-height:220px;overflow-y:auto;margin-bottom:1rem">
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem;border:1px solid var(--border);border-radius:var(--radius-sm)">
+                <div>
+                  <span style="font-weight:700;font-size:0.8rem">Sarah Chen</span> <span class="badge" style="font-size:0.62rem">ML Expert</span>
+                  <div style="font-size:0.68rem;color:var(--text-secondary)">Verified 4.9★ | 18 bookings</div>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="bookMentor('Sarah Chen')" style="font-size:0.68rem;padding:0.2rem 0.4rem">Pair</button>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem;border:1px solid var(--border);border-radius:var(--radius-sm)">
+                <div>
+                  <span style="font-weight:700;font-size:0.8rem">Michael K.</span> <span class="badge" style="font-size:0.62rem">React Pro</span>
+                  <div style="font-size:0.68rem;color:var(--text-secondary)">Verified 4.8★ | 12 bookings</div>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="bookMentor('Michael K.')" style="font-size:0.68rem;padding:0.2rem 0.4rem">Pair</button>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-sm" style="width:100%" onclick="closeMentorModal()">Cancel</button>
+          </div>
+        </div>
+
+        <!-- 👥 AI Team Matchmaking Modal -->
+        <div id="team-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(3,7,18,0.85);z-index:9999;align-items:center;justify-content:center;padding:1.5rem">
+          <div class="glass card" style="width:100%;max-width:440px;padding:1.5rem;position:relative">
+            <h4 style="font-family:var(--font-heading);font-weight:800;color:var(--success);font-size:1rem;margin-bottom:0.5rem;display:flex;justify-content:space-between;align-items:center">
+              <span>👥 AI Team Matchmaker</span>
+              <button onclick="closeTeamMatchModal()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:1.1rem;outline:none">✕</button>
+            </h4>
+            <p style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:1rem">Complimentary team matchmaking evaluates peer roadmap skills to coordinate project squads.</p>
+            
+            <div style="padding:1rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:rgba(255,255,255,0.01);text-align:center;margin-bottom:1rem">
+              <span style="font-size:1.5rem">✨</span>
+              <h5 style="font-weight:800;font-size:0.82rem;margin-top:0.35rem">Complementary Peer Pairing</h5>
+              <p style="font-size:0.7rem;color:var(--text-secondary);margin-top:0.2rem">Click calculate to discover compatible project companions.</p>
+              <button class="btn btn-primary btn-sm" onclick="findTeamMatch()" style="margin-top:0.75rem" id="btn-team-find">Calculate Compatibility</button>
+            </div>
+            
+            <div id="team-match-result" style="display:none;padding:0.75rem;border:1px solid var(--success);border-radius:var(--radius-sm);background:rgba(16,185,129,0.03);font-size:0.75rem;line-height:1.4">
+              <strong style="color:var(--success)">⭐ COMPATIBLE CO-FOUNDER PAIR FOUND!</strong><br>
+              Partner with <strong>Alex Rivera</strong> (React UI Specialist).<br>
+              • Skills Synergy Index: 98%<br>
+              • Shared Goal: Build a Glassmorphic Booking Portal.<br>
+              • Shared Workspace: Dispatching Trello workspace desk invitation.
+            </div>
+          </div>
+        </div>
+      `;
+
+      // ── Quiz State ──
+      let quizQs = [], qIdx = 0, qScore = 0, qSel = null, qTimer = null, qTime = 60, qSkill = '';
+      window.activeStepDetails = {};
+
+      // ── Load Everything ──
+      loadAll();
+
+      function loadAll() {
+        Promise.all([
+          API.get('/auth/me'),
+          API.get('/users/achievements').catch(() => []),
+          API.get('/users/missions').catch(() => ({missions:[], streak_days:0})),
+          API.get('/ai/analytics').catch(() => null)
+        ]).then(([user, badges, missions, analytics]) => {
+          const p = user.profile || {};
+
+          // Stats bar
+          document.getElementById('career-stats').innerHTML = `
+            <article class="glass stat-card"><span class="label">⚡ Level</span><span class="value" style="color:var(--accent)">${p.level||'Rookie'}</span></article>
+            <article class="glass stat-card"><span class="label">🔥 XP</span><span class="value">${p.xp||0}</span></article>
+            <article class="glass stat-card"><span class="label">⭐ Rating</span><span class="value">${(p.rating_avg||0) > 0 ? (p.rating_avg).toFixed(1) : '—'}</span></article>
+            <article class="glass stat-card"><span class="label">✅ Verified</span><span class="value">${p.is_verified ? 'Yes' : 'No'}</span></article>
+          `;
+
+          // Profile snapshot
+          document.getElementById('p-level').textContent = p.level || 'Rookie';
+          document.getElementById('p-xp').textContent = p.xp || 0;
+
+          // Badges
+          const bl = document.getElementById('badges-list');
+          bl.innerHTML = !badges.length
+            ? '<span class="badge-pill" style="opacity:.5">🔒 None yet — pass a quiz!</span>'
+            : badges.map(b => `<span class="badge-pill">${b.badge_icon||'🏆'} ${b.title}</span>`).join('');
+
+          // Missions
+          const ml = document.getElementById('missions-list');
+          const ms = missions.missions || [];
+          ml.innerHTML = !ms.length
+            ? '<p style="color:var(--text-secondary);font-size:.8rem">No active missions.</p>'
+            : ms.map(m => `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem .6rem;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:.3rem;${m.status==='completed'?'border-color:var(--success);background:rgba(16,185,129,.04)':''}">
+                <div>
+                  <div style="font-size:.82rem;font-weight:600;${m.status==='completed'?'text-decoration:line-through;color:var(--text-secondary)':''}">${m.title}</div>
+                  <div style="font-size:.7rem;color:var(--text-secondary)">${m.description}</div>
+                </div>
+                <span style="font-size:.72rem;font-weight:700;color:var(--accent)">${m.reward}</span>
+              </div>`).join('');
+
+          // AI insights
+          if (analytics) {
+            document.getElementById('ai-trust').textContent = (analytics.trust_score || p.trust_score || 95) + '%';
+
+            // Earnings chart
+            if (analytics.predicted_earnings) {
+              const data = analytics.predicted_earnings;
+              const max = Math.max(...data);
+              const w = 280, h = 75;
+              const pts = data.map((v, i) => `${(i/(data.length-1))*w},${h - (v/max)*65}`);
+              document.getElementById('svg-line').setAttribute('d', `M ${pts.join(' L ')}`);
+              document.getElementById('svg-area').setAttribute('d', `M ${pts.join(' L ')} L ${w},${h} L 0,${h} Z`);
+            }
+
+            // Trending Skills Leaderboard
+            if (analytics.skill_growth_trends) {
+              const tsl = document.getElementById('trending-skills-list');
+              if (tsl) {
+                tsl.innerHTML = analytics.skill_growth_trends.map((t, i) => `
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:var(--radius-sm);background:rgba(255,255,255,0.01)">
+                    <div style="display:flex;align-items:center;gap:0.5rem">
+                      <span style="font-weight:800;color:var(--accent);font-size:0.9rem">#${i+1}</span>
+                      <div>
+                        <span style="font-weight:700;font-size:0.82rem">${t.skill}</span>
+                        <span class="badge" style="font-size:0.6rem;padding:0.1rem 0.3rem;margin-left:0.3rem;background:${t.demand === 'increased' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)'};color:${t.demand === 'increased' ? 'var(--success)' : 'var(--warning)'}">${t.demand.toUpperCase()}</span>
+                      </div>
+                    </div>
+                    <span style="font-size:0.8rem;font-weight:700;color:var(--success)">+${t.growth} Growth</span>
+                  </div>
+                `).join('');
+              }
+            }
+          }
+
+          // Load roadmap
+          loadRoadmap();
+
+        }).catch(err => showToast('Error: ' + err.message, 'error'));
+      }
+
+      // ── Console Navigation Helpers ──
+      window.scrollToElement = function(id) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.scrollIntoView({behavior:'smooth'});
+          // Highlight target briefly
+          el.style.borderColor = 'var(--accent)';
+          setTimeout(() => el.style.borderColor = '', 1500);
+        }
+      };
+
+      window.toggleCodeAssistant = function() {
+        const box = document.getElementById('code-assistant-modal');
+        box.style.display = box.style.display === 'none' ? 'block' : 'none';
+        if (box.style.display === 'block') {
+          box.scrollIntoView({behavior:'smooth'});
+        }
+      };
+
+      window.runCodeAssistant = function() {
+        const query = document.getElementById('code-query').value.trim();
+        if (!query) { showToast('Please paste a code snippet first!', 'warning'); return; }
+        
+        API.post('/ai/moderate', { text: query }).then(res => {
+          const out = document.getElementById('code-assistant-result');
+          out.style.display = 'block';
+          
+          if (res.flagged) {
+            out.innerHTML = `<span style="color:var(--danger);font-weight:700">⚠️ SECURITY AUDIT FAILED: Flagged for ${res.categories.join(', ')}.</span><br>Recommendation: ${res.recommendation}`;
+          } else {
+            out.innerHTML = `
+              <span style="color:var(--success);font-weight:700">✅ SECURE AND OPTIMIZED: Audit approved.</span><br>
+              <strong>Algorithmic Review:</strong><br>
+              • Parameterized architecture safeguards against injections.<br>
+              • Space Complexity: O(1) optimal allocation.<br>
+              • Standards Compliance: 100% campus criteria matched.
+            `;
+          }
+        }).catch(err => showToast('Assistant error: ' + err.message, 'error'));
+      };
+
+      window.openMentorModal = function() {
+        document.getElementById('mentor-modal').style.display = 'flex';
+      };
+      
+      window.closeMentorModal = function() {
+        document.getElementById('mentor-modal').style.display = 'none';
+      };
+
+      window.bookMentor = function(name) {
+        showToast(`Peer collaboration slot with ${name} requested successfully!`, 'success');
+        closeMentorModal();
+      };
+
+      window.openTeamMatchModal = function() {
+        document.getElementById('team-modal').style.display = 'flex';
+        document.getElementById('team-match-result').style.display = 'none';
+        document.getElementById('btn-team-find').style.display = 'inline-block';
+      };
+
+      window.closeTeamMatchModal = function() {
+        document.getElementById('team-modal').style.display = 'none';
+      };
+
+      window.findTeamMatch = function() {
+        const btn = document.getElementById('btn-team-find');
+        btn.textContent = 'Analyzing skill gaps...';
+        btn.disabled = true;
+        setTimeout(() => {
+          document.getElementById('team-match-result').style.display = 'block';
+          btn.style.display = 'none';
+          btn.textContent = 'Calculate Compatibility';
+          btn.disabled = false;
+          showToast('Peer pairing computed successfully!', 'success');
+        }, 1200);
+      };
+
+      // ── Career Roadmap ──
+      window.loadRoadmap = function() {
+        const role = document.getElementById('roadmap-role').value;
+        API.get(`/ai/roadmap?role=${encodeURIComponent(role)}`).then(data => {
+          document.getElementById('roadmap-desc').textContent = data.description;
+          window.activeStepDetails = data.step_details || {};
+
+          // Clickable flowchart step nodes
+          document.getElementById('roadmap-steps').innerHTML = data.steps.map((s, i) =>
+            `<button class="roadmap-node" onclick="showNodeDetails('${s}')" style="cursor:pointer;border-color:var(--accent);transition:var(--transition);outline:none">${s}</button>` + 
+            (i < data.steps.length-1 ? '<span class="roadmap-arrow">→</span>' : '')
+          ).join('');
+
+          // Auto-highlight first step concepts details on load
+          if (data.steps.length > 0) {
+            showNodeDetails(data.steps[0]);
+          }
+
+          // Gaps
+          document.getElementById('roadmap-gaps').innerHTML = data.gaps.map(g =>
+            `<div class="skill-row">
+              <span style="font-weight:600">${g.skill}</span>
+              ${g.verified
+                ? '<span class="badge" style="background:rgba(16,185,129,.12);color:var(--success);font-size:.7rem">Verified ✅</span>'
+                : `<button class="btn btn-primary btn-sm" onclick="quickQuiz('${g.skill}')" style="font-size:.7rem;padding:.2rem .5rem">⚡ Verify Skill</button>`}
+            </div>`
+          ).join('');
+
+          // Project recs
+          document.getElementById('roadmap-recs').innerHTML = !data.recommendations?.length
+            ? '<p style="color:var(--text-secondary);font-size:.78rem">No matching projects right now.</p>'
+            : data.recommendations.map(p =>
+              `<div class="skill-row">
+                <div><span style="font-weight:600">${p.title}</span><br><span style="font-size:.72rem;color:var(--success)">${p.budget.toFixed(0)} Cr</span></div>
+                <a href="projects.html" class="btn btn-ghost btn-sm" style="font-size:.7rem;padding:.2rem .5rem">View</a>
+              </div>`
+            ).join('');
+        }).catch(err => showToast('Roadmap error: ' + err.message, 'error'));
+      };
+
+      // ── Interactive Syllabus Concept Details Drawer ──
+      window.showNodeDetails = function(stepName) {
+        const details = window.activeStepDetails ? window.activeStepDetails[stepName] : null;
+        const box = document.getElementById('node-details-box');
+        if (!details) {
+          box.style.display = 'none';
+          return;
+        }
+        
+        box.style.display = 'block';
+        box.innerHTML = `
+          <div style="padding:1rem;border:1px solid var(--accent);border-radius:var(--radius-md);background:rgba(139, 92, 246, 0.04);margin-top:1.25rem">
+            <h4 style="font-family:var(--font-heading);font-weight:800;color:var(--accent);font-size:0.92rem;margin-bottom:0.5rem">📖 Masterclass Syllabus: ${stepName}</h4>
+            <ul style="padding-left:1.25rem;font-size:0.8rem;color:var(--text-primary);margin-bottom:0.75rem;line-height:1.4">
+              ${details.concepts.map(c => `<li>${c}</li>`).join('')}
+            </ul>
+            <div style="border-top:1px solid var(--border);padding-top:0.5rem">
+              <span style="font-size:0.72rem;color:var(--text-secondary);font-weight:700;display:block;margin-bottom:0.35rem">📚 Curated Reading & Resources:</span>
+              <div style="display:flex;flex-wrap:wrap;gap:0.4rem">
+                ${details.resources.map(r => `<a href="${r.url}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:0.7rem;padding:0.2rem 0.5rem">🔗 ${r.name}</a>`).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      };
+
+      // ── Timed Quiz Logic ──
+      window.startQuiz = function() {
+        document.getElementById('quiz-review-box').style.display = 'none';
+        qSkill = document.getElementById('quiz-topic').value;
+        API.post('/ai/interviews/generate', { skill: qSkill }).then(data => {
+          quizQs = data.questions; qIdx = 0; qScore = 0; qSel = null;
+          document.getElementById('quiz-init').style.display = 'none';
+          document.getElementById('quiz-active').style.display = 'block';
+          renderQ();
+          startTimer();
+        }).catch(err => showToast('Error: ' + err.message, 'error'));
+      };
+
+      function renderQ() {
+        const q = quizQs[qIdx];
+        document.getElementById('quiz-progress').textContent = `${qIdx+1}/${quizQs.length}`;
+        document.getElementById('quiz-q').textContent = q.question;
+        document.getElementById('quiz-opts').innerHTML = q.options.map(o =>
+          `<button class="quiz-opt" onclick="pickOpt(this,'${o.replace(/'/g,"\\'")}')">${o}</button>`
+        ).join('');
+        qSel = null;
+        document.getElementById('quiz-next').textContent = qIdx === quizQs.length-1 ? 'Finish' : 'Next';
+      }
+
+      window.pickOpt = function(btn, val) {
+        document.querySelectorAll('.quiz-opt').forEach(b => b.classList.remove('sel'));
+        btn.classList.add('sel');
+        qSel = val;
+        if (quizQs[qIdx]) {
+          quizQs[qIdx].selected_value = val;
+        }
+      };
+
+      function startTimer() {
+        qTime = 60;
+        document.getElementById('quiz-timer').textContent = `⏱ ${qTime}s`;
+        clearInterval(qTimer);
+        qTimer = setInterval(() => {
+          qTime--;
+          document.getElementById('quiz-timer').textContent = `⏱ ${qTime}s`;
+          if (qTime <= 0) { clearInterval(qTimer); finishQuiz(); }
+        }, 1000);
+      }
+
+      window.submitAnswer = function() {
+        if (!qSel) { showToast('Select an answer', 'warning'); return; }
+        if (qSel === quizQs[qIdx].answer) qScore++;
+        if (qIdx < quizQs.length - 1) { qIdx++; renderQ(); }
+        else { clearInterval(qTimer); finishQuiz(); }
+      };
+
+      function finishQuiz() {
+        API.post('/ai/interviews/evaluate', { skill: qSkill, score: qScore, total: quizQs.length }).then(data => {
+          showToast(data.passed
+            ? `🏆 Passed! Score: ${data.score_percentage}%`
+            : `❌ Failed. Score: ${data.score_percentage}%. Need 80%+.`,
+            data.passed ? 'success' : 'error');
+            
+          document.getElementById('quiz-active').style.display = 'none';
+          const reviewBox = document.getElementById('quiz-review-box');
+          reviewBox.style.display = 'block';
+          
+          let feedbackHtml = quizQs.map((q, idx) => {
+            const isCorrect = q.answer === q.selected_value;
+            return `
+              <div style="padding:0.6rem;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:0.4rem;${isCorrect ? 'border-color:var(--success)' : 'border-color:var(--danger)'}">
+                <div style="font-size:0.8rem;font-weight:700">Q${idx+1}: ${q.question}</div>
+                <div style="font-size:0.75rem;color:${isCorrect ? 'var(--success)' : 'var(--danger)'}">Your Choice: ${q.selected_value || 'None'}</div>
+                <div style="font-size:0.75rem;color:var(--success)">Correct Choice: ${q.answer}</div>
+                <div style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.25rem"><strong>💡 Learning Insight:</strong> Review the core rules and syntax guidelines for this topic to solidify your understanding.</div>
+              </div>
+            `;
+          }).join('');
+          
+          reviewBox.innerHTML = `
+            <h4 style="font-family:var(--font-heading);font-weight:800;font-size:0.95rem;margin-bottom:0.5rem;color:${data.passed ? 'var(--success)' : 'var(--danger)'}">
+              ${data.passed ? '🏆 Assessment Approved!' : '❌ Assessment Failed'} (${data.score_percentage}%)
+            </h4>
+            <p style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:0.75rem">Here is your comprehensive timed assessment feedback report:</p>
+            <div style="max-height:180px;overflow-y:auto;margin-bottom:0.75rem">
+              ${feedbackHtml}
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="closeQuizReview()" style="width:100%">Back to Quizzes</button>
+          `;
+          
+          loadAll();
+        }).catch(err => showToast('Evaluation failed: ' + err.message, 'error'));
+      }
+
+      window.cancelQuiz = function() {
+        clearInterval(qTimer);
+        document.getElementById('quiz-active').style.display = 'none';
+        document.getElementById('quiz-init').style.display = 'block';
+      };
+
+      window.closeQuizReview = function() {
+        document.getElementById('quiz-review-box').style.display = 'none';
+        document.getElementById('quiz-init').style.display = 'block';
+      };
+
+      window.quickQuiz = function(skill) {
+        const map = { 
+          HTML: 'Python', 
+          JavaScript: 'React', 
+          React: 'React', 
+          Python: 'Python', 
+          Design: 'Design',
+          Excel: 'Database Security',
+          'Data Analysis': 'Machine Learning',
+          'Machine Learning': 'Machine Learning'
+        };
+        document.getElementById('quiz-topic').value = map[skill] || 'Python';
+        startQuiz();
+        document.getElementById('quiz-room').scrollIntoView({behavior:'smooth'});
+      };
+
+      // ── Creative Startup Project Ideas Generator ──
+      window.generateIdea = function() {
+        const skill = document.getElementById('idea-skill').value;
+        API.post('/ai/ideas-generator', { skills: [skill] }).then(data => {
+          document.getElementById('idea-result').style.display = 'block';
+          document.getElementById('idea-title').textContent = data.title;
+          document.getElementById('idea-prob').innerHTML = `<strong>Problem:</strong> ${data.problem}`;
+          document.getElementById('idea-stack').textContent = data.stack;
+          
+          document.getElementById('idea-milestones').innerHTML = data.milestones.map(m => `<li>${m}</li>`).join('');
+          showToast('Fresh micro-startup project milestones generated!', 'success');
+        }).catch(err => showToast('Ideas engine failed: ' + err.message, 'error'));
+      };
+
+      // ── Resume Builder ──
+      window.compileResume = function() {
+        API.get('/users/resume-builder').then(data => {
+          document.getElementById('resume-out').style.display = 'block';
+          document.getElementById('resume-md').value = data.resume_markdown;
+          showToast('Resume generated!', 'success');
+        }).catch(err => showToast('Error: ' + err.message, 'error'));
+      };
+
+      window.runResumeAnalyzer = function() {
+        const resumeText = document.getElementById('resume-md') ? document.getElementById('resume-md').value : "";
+        const targetRole = document.getElementById('analysis-role').value;
+        
+        API.post('/ai/resume-analyzer', {
+          resume_text: resumeText,
+          target_role: targetRole
+        }).then(res => {
+          document.getElementById('analyzer-out').style.display = 'block';
+          document.getElementById('ats-score').textContent = res.ats_score + '%';
+          document.getElementById('grammar-score').textContent = res.grammar_score + '%';
+          
+          const issuesList = document.getElementById('grammar-issues-list');
+          issuesList.innerHTML = res.grammar_analysis.map(x => `<li>${x}</li>`).join('');
+          
+          const missingTags = document.getElementById('missing-skills-tags');
+          if (res.missing_skills.length === 0) {
+            missingTags.innerHTML = '<span class="badge" style="background:rgba(16,185,129,0.12);color:var(--success);font-size:.7rem">No missing keywords! 🎉</span>';
+          } else {
+            missingTags.innerHTML = res.missing_skills.map(s => `<span class="badge" style="font-size:.7rem;margin:0.1rem">${s}</span>`).join('');
+          }
+          
+          const improvements = document.getElementById('improvements-list');
+          improvements.innerHTML = res.improvement_suggestions.map(x => `<li>${x}</li>`).join('');
+          
+          showToast('AI ATS and Resume Scan completed successfully!', 'success');
+        }).catch(err => showToast('Analysis failed: ' + err.message, 'error'));
+      };
+
+      window.runPortfolioScorer = function() {
+        API.get('/ai/portfolio-score').then(res => {
+          document.getElementById('portfolio-score-out').style.display = 'block';
+          document.getElementById('port-match-score').textContent = res.score + '/100';
+          document.getElementById('port-count').textContent = res.portfolio_count;
+          document.getElementById('port-rating').textContent = (res.ratings_avg || 0.0).toFixed(1) + '★';
+          document.getElementById('port-skills').textContent = res.skills_count;
+          
+          const posList = document.getElementById('port-positives-list');
+          posList.innerHTML = res.positives.map(x => `<li>${x}</li>`).join('');
+          
+          const impList = document.getElementById('port-improvements-list');
+          impList.innerHTML = res.improvements.length === 0 
+            ? '<li>Perfect profile score! Keep it up. 🚀</li>' 
+            : res.improvements.map(x => `<li>${x}</li>`).join('');
+          
+          showToast('Profile portfolio score scanned successfully!', 'success');
+        }).catch(err => showToast('Portfolio evaluator failed: ' + err.message, 'error'));
+      };
+
+      window.copyResume = function() {
+        const t = document.getElementById('resume-md');
+        t.select();
+        document.execCommand('copy');
+        showToast('Copied!', 'success');
+      };
+
+      window.downloadResume = function() {
+        const md = document.getElementById('resume-md').value;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([md], {type:'text/markdown'}));
+        a.download = 'skillswap_resume.md';
+        a.click();
+      };
+
+      window.exportResumePDF = function() {
+        const md = document.getElementById('resume-md').value;
+        if (!md) { showToast('Please generate your resume first!', 'warning'); return; }
+        
+        // Simple Markdown-to-HTML parser for formatting inside the print window
+        let htmlContent = md
+          .replace(/^# (.*$)/gim, '<h1 class="print-name">$1</h1>')
+          .replace(/^\*Campus: (.*$)/gim, '<div class="print-meta">$1</div>')
+          .replace(/^\*LinkedIn: (.*$)/gim, '<div class="print-social">$1</div>')
+          .replace(/^## (.*$)/gim, '<h2 class="print-section">$1</h2>')
+          .replace(/^---$/gim, '<hr class="print-divider">')
+          .replace(/^\d+\. \*\*(.*?)\*\* \(Link: (.*?)\)/gim, '<div class="print-item"><strong>$1</strong> <span class="print-link">($2)</span></div>')
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(/`(.*?)`/g, '<code>$1</code>')
+          .replace(/\n/g, '<br>');
+          
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>SkillSwap CV - Export</title>
+              <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+              <style>
+                body {
+                  font-family: 'Plus Jakarta Sans', sans-serif;
+                  color: #0f172a;
+                  padding: 2.5rem;
+                  max-width: 800px;
+                  margin: 0 auto;
+                  line-height: 1.5;
+                  font-size: 10.5pt;
+                }
+                .print-name {
+                  font-family: 'Space Grotesk', sans-serif;
+                  font-size: 24pt;
+                  font-weight: 800;
+                  margin: 0 0 0.25rem 0;
+                  color: #1e1b4b;
+                  text-align: center;
+                  letter-spacing: -0.03em;
+                }
+                .print-meta, .print-social {
+                  font-size: 9.5pt;
+                  color: #475569;
+                  text-align: center;
+                  margin-bottom: 0.15rem;
+                }
+                .print-divider {
+                  border: none;
+                  border-top: 1.5px solid #e2e8f0;
+                  margin: 1.25rem 0;
+                }
+                .print-section {
+                  font-family: 'Space Grotesk', sans-serif;
+                  font-size: 12.5pt;
+                  font-weight: 700;
+                  color: #4338ca;
+                  margin: 1.25rem 0 0.5rem 0;
+                  text-transform: uppercase;
+                  letter-spacing: -0.01em;
+                }
+                .print-item {
+                  margin-bottom: 0.4rem;
+                }
+                .print-link {
+                  font-size: 8.5pt;
+                  color: #64748b;
+                }
+                strong {
+                  color: #0f172a;
+                }
+                code {
+                  font-family: monospace;
+                  background: #f1f5f9;
+                  padding: 0.1rem 0.3rem;
+                  border-radius: 4px;
+                }
+                @media print {
+                  body { padding: 0; }
+                  @page { margin: 1.5cm; }
+                }
+              </style>
+            </head>
+            <body>
+              ${htmlContent}
+              <script>
+                window.onload = function() {
+                  window.print();
+                  setTimeout(() => window.close(), 1000);
+                }
+              <\/script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+        showToast('PDF compilation window launched successfully!', 'success');
+      };
+    });
+  </script>
+</body>
+</html>

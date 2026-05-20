@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Client Dashboard | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <style>
+    .cdash{display:grid;grid-template-columns:1fr 300px;gap:1.5rem;margin-top:1.25rem}
+    @media(max-width:960px){.cdash{grid-template-columns:1fr}}
+    .pipe-bar{display:flex;gap:1px;height:6px;border-radius:99px;overflow:hidden;margin:.6rem 0}
+    .pipe-seg{height:100%;transition:width .5s}
+    .pipe-legend{display:flex;gap:1.25rem;font-size:.75rem;color:var(--text-secondary);flex-wrap:wrap}
+    .pipe-legend strong{color:var(--text-primary)}
+    .ql{display:flex;align-items:center;gap:.65rem;padding:.6rem .85rem;border-radius:var(--radius-md);border:1px solid var(--border);margin-bottom:.4rem;cursor:pointer;transition:border-color .2s,background .2s;text-decoration:none;color:var(--text-primary)}
+    .ql:hover{border-color:var(--accent);background:var(--accent-glow)}
+    .ql-icon{font-size:1.1rem;flex-shrink:0}
+    .ql-title{font-weight:600;font-size:.82rem}
+    
+    /* Interactive Spending Analytics & Chart Styles */
+    .chart-card {
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .chart-svg {
+      width: 100%;
+      height: 165px;
+      overflow: visible;
+    }
+    .chart-path {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 3.5;
+      stroke-linecap: round;
+    }
+    .chart-grid {
+      stroke: var(--border);
+      stroke-width: 1;
+      stroke-dasharray: 4 4;
+      opacity: 0.5;
+    }
+    .chart-point-group:hover circle {
+      r: 7;
+      fill: var(--accent-hover);
+      filter: drop-shadow(0 0 6px var(--accent));
+      transition: all 0.2s ease;
+    }
+    
+    /* Wallet Top Up and presets */
+    .topup-presets {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .topup-btn {
+      flex: 1;
+      padding: 0.4rem 0.5rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-primary);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+    .topup-btn:hover {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+    }
+    
+    /* Disputes alerts */
+    .alert-banner {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+      border-radius: var(--radius-md);
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+      color: #fca5a5;
+      margin-bottom: 1.25rem;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+  <script>
+    initDashboard('client', 'dashboard', 'Dashboard', function(el) {
+      el.innerHTML = `
+        <!-- Active Dispute Alerts -->
+        <div id="dispute-alerts-container"></div>
+
+        <div class="stats-grid" id="st">
+          <div class="glass card skeleton" style="height:80px"></div>
+          <div class="glass card skeleton" style="height:80px"></div>
+          <div class="glass card skeleton" style="height:80px"></div>
+          <div class="glass card skeleton" style="height:80px"></div>
+        </div>
+
+        <!-- Pipeline -->
+        <article class="glass card" style="padding:1rem 1.5rem; margin-bottom: 1.25rem;" id="pipe-card">
+          <h3 style="font-size:.95rem;margin-bottom:0">Project Pipeline</h3>
+          <div class="pipe-bar" id="pipe-bar"></div>
+          <div class="pipe-legend" id="pipe-legend"></div>
+        </article>
+
+        <div class="cdash">
+          <div>
+            <!-- Monthly Spending Analytics Chart -->
+            <article class="glass card chart-card">
+              <h3 style="font-size:.95rem;margin-bottom:.75rem">Monthly Spending Curve (Credits)</h3>
+              <svg class="chart-svg" id="spending-chart-svg" viewBox="0 0 380 165">
+                <defs>
+                  <linearGradient id="chart-grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.3"></stop>
+                    <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.0"></stop>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </article>
+
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <h3 style="font-size:1rem;margin:0">Active Campaigns</h3>
+                <a href="post-project.html" class="btn btn-primary btn-sm" style="font-size:.75rem">+ New Project</a>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Project</th><th>Budget</th><th>Status</th><th>Actions</th></tr></thead>
+                  <tbody id="tbl"><tr><td colspan="4" style="text-align:center">Loading...</td></tr></tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:1.25rem">
+            <!-- Interactive Wallet Top-up -->
+            <article class="glass card" style="padding:1.25rem">
+              <h4 style="font-size:.9rem;margin-bottom:.35rem">💳 Wallet Controls</h4>
+              <p style="color:var(--text-secondary);font-size:.78rem;margin-bottom:.85rem">Top-up virtual credits instantly to fund new projects.</p>
+              
+              <div style="display:flex; gap:.5rem; margin-bottom:.5rem">
+                <input type="number" id="topup-amount" min="10" max="5000" placeholder="Amount (Cr)" class="form-control" style="padding:.4rem; font-size:.85rem">
+                <button id="topup-btn" class="btn btn-primary btn-sm" style="white-space:nowrap">Add Funds</button>
+              </div>
+              <div class="topup-presets">
+                <button type="button" class="topup-btn" onclick="document.getElementById('topup-amount').value=100">+100 Cr</button>
+                <button type="button" class="topup-btn" onclick="document.getElementById('topup-amount').value=500">+500 Cr</button>
+                <button type="button" class="topup-btn" onclick="document.getElementById('topup-amount').value=1000">+1000 Cr</button>
+              </div>
+            </article>
+
+            <!-- Team Hiring Stats -->
+            <article class="glass card" style="padding:1.25rem">
+              <h4 style="font-size:.9rem;margin-bottom:.75rem">👥 Active Team Stats</h4>
+              <div style="display:flex; flex-direction:column; gap:.75rem">
+                <div style="display:flex; justify-content:space-between; align-items:center">
+                  <span style="font-size:.82rem; color:var(--text-secondary)">Hired Developers</span>
+                  <strong id="hired-devs-count" style="font-size:.9rem; color:var(--accent)">0</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center">
+                  <span style="font-size:.82rem; color:var(--text-secondary)">Collaborative Teams</span>
+                  <strong id="collab-teams-count" style="font-size:.9rem">0</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center">
+                  <span style="font-size:.82rem; color:var(--text-secondary)">Open Applications</span>
+                  <strong id="open-apps-count" style="font-size:.9rem">0</strong>
+                </div>
+              </div>
+            </article>
+
+            <!-- Quick Nav -->
+            <article class="glass card" style="padding:1.25rem">
+              <h4 style="font-size:.9rem;margin-bottom:.65rem">Quick Actions</h4>
+              <a href="workspace.html" class="ql"><span class="ql-icon">🖥️</span><span class="ql-title">Workspace</span></a>
+              <a href="applicants.html" class="ql"><span class="ql-icon">👥</span><span class="ql-title">Applicants</span></a>
+              <a href="messages.html" class="ql"><span class="ql-icon">💬</span><span class="ql-title">Messages</span></a>
+              <a href="payments.html" class="ql"><span class="ql-icon">💳</span><span class="ql-title">Payments</span></a>
+              <a href="disputes.html" class="ql"><span class="ql-icon">⚖️</span><span class="ql-title">Disputes</span></a>
+              <a href="analytics.html" class="ql"><span class="ql-icon">📈</span><span class="ql-title">Analytics</span></a>
+            </article>
+          </div>
+        </div>
+      `;
+
+      const st = document.getElementById('st');
+      const tbl = document.getElementById('tbl');
+
+      function drawChart(history) {
+        // Core data plotting
+        const chartPoints = [
+          { x: 30, y: 130 },
+          { x: 90, y: 100 },
+          { x: 150, y: 110 },
+          { x: 210, y: 60 },
+          { x: 270, y: 80 },
+          { x: 330, y: 30 }
+        ];
+        
+        const spends = (history || []).filter(t => t.type === 'escrow_release' || t.type === 'payment');
+        if (spends.length > 0) {
+          let cum = 0;
+          const points = spends.slice(-6).map((s, idx) => {
+            cum += parseFloat(s.amount);
+            return { val: cum, date: new Date(s.created_at || Date.now()).toLocaleDateString(undefined, {month:'short', day:'numeric'}) };
+          });
+          const maxVal = Math.max(...points.map(p => p.val), 100);
+          const minVal = 0;
+          const range = maxVal - minVal || 1;
+          
+          let xCoords = [30, 95, 160, 225, 290, 355];
+          chartPoints.length = 0;
+          points.forEach((p, idx) => {
+            const y = 130 - ((p.val - minVal) / range) * 100;
+            chartPoints.push({ x: xCoords[idx] || 30, y: y, label: p.date, val: p.val });
+          });
+        } else {
+          // Beautiful obsidian placeholder chart
+          chartPoints[0].label = "Jan"; chartPoints[0].val = 50;
+          chartPoints[1].label = "Feb"; chartPoints[1].val = 120;
+          chartPoints[2].label = "Mar"; chartPoints[2].val = 90;
+          chartPoints[3].label = "Apr"; chartPoints[3].val = 250;
+          chartPoints[4].label = "May"; chartPoints[4].val = 180;
+          chartPoints[5].label = "Jun"; chartPoints[5].val = 320;
+        }
+
+        const pathD = chartPoints.reduce((acc, p, idx) => {
+          if (idx === 0) return `M ${p.x} ${p.y}`;
+          const prev = chartPoints[idx - 1];
+          const cpX1 = prev.x + (p.x - prev.x) / 2;
+          const cpY1 = prev.y;
+          const cpX2 = prev.x + (p.x - prev.x) / 2;
+          const cpY2 = p.y;
+          return `${acc} C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p.x} ${p.y}`;
+        }, "");
+
+        const fillD = `${pathD} L ${chartPoints[chartPoints.length - 1].x} 140 L ${chartPoints[0].x} 140 Z`;
+
+        const circles = chartPoints.map(p => `
+          <g class="chart-point-group" style="cursor:pointer">
+            <circle cx="${p.x}" cy="${p.y}" r="5" fill="var(--accent)" stroke="var(--bg-secondary)" stroke-width="2" />
+            <circle cx="${p.x}" cy="${p.y}" r="12" fill="var(--accent)" opacity="0" class="hover-trigger" />
+            <title>${p.label}: ${p.val.toFixed(0)} Credits</title>
+          </g>
+        `).join('');
+
+        const labels = chartPoints.map(p => `
+          <text x="${p.x}" y="155" text-anchor="middle" fill="var(--text-secondary)" font-size="10" font-family="var(--font-sans)">${p.label || ''}</text>
+        `).join('');
+
+        document.getElementById('spending-chart-svg').innerHTML = `
+          <!-- Grid Lines -->
+          <line x1="30" y1="30" x2="360" y2="30" class="chart-grid" />
+          <line x1="30" y1="80" x2="360" y2="80" class="chart-grid" />
+          <line x1="30" y1="130" x2="360" y2="130" class="chart-grid" />
+          
+          <!-- Gradient Area -->
+          <path d="${fillD}" fill="url(#chart-grad)" opacity="0.15" />
+          
+          <!-- Core Trend Line -->
+          <path d="${pathD}" class="chart-path" />
+          
+          <!-- Data Points -->
+          ${circles}
+          
+          <!-- Labels -->
+          ${labels}
+        `;
+      }
+
+      async function load() {
+        try {
+          const [user, projects, history, disputes, teams] = await Promise.all([
+            API.get('/auth/me'),
+            API.get('/projects/my'),
+            API.get('/payments/history'),
+            API.get('/disputes'),
+            API.get('/teams')
+          ]);
+
+          const open = projects.filter(p => p.status === 'open').length;
+          const prog = projects.filter(p => p.status === 'in_progress').length;
+          const sub = projects.filter(p => p.status === 'submitted').length;
+          const done = projects.filter(p => p.status === 'completed').length;
+          const disp = projects.filter(p => p.status === 'disputed' || p.status === 'Disputed').length;
+          const spent = projects.filter(p => p.status === 'completed').reduce((s,p) => s + (p.budget||0), 0);
+
+          st.innerHTML = `
+            <article class="glass stat-card"><span class="label">💳 Wallet</span><span class="value" style="color:var(--success)">${user.wallet_balance.toFixed(0)} Cr</span></article>
+            <article class="glass stat-card"><span class="label">💼 Projects</span><span class="value">${projects.length}</span></article>
+            <article class="glass stat-card"><span class="label">🔒 In Escrow</span><span class="value" style="color:var(--warning)">${prog + sub}</span></article>
+            <article class="glass stat-card"><span class="label">💸 Spent</span><span class="value">${formatMoney(spent)}</span></article>
+          `;
+
+          // Dispute warning alerts
+          const clientDisputes = disputes.filter(d => projects.some(p => p.id === d.project_id) && d.status !== 'resolved');
+          const alertContainer = document.getElementById('dispute-alerts-container');
+          if (clientDisputes.length > 0) {
+            alertContainer.innerHTML = clientDisputes.map(d => `
+              <div class="alert-banner">
+                <span>⚠️</span>
+                <div style="flex:1">
+                  <strong>Active Escrow Dispute:</strong> "${d.title}" is currently under review by campus admins. Payout funds are locked.
+                </div>
+                <a href="disputes.html" class="btn btn-ghost btn-sm" style="font-size:.75rem; border-color:rgba(239, 68, 68, 0.4); color:#fca5a5">Mediate</a>
+              </div>
+            `).join('');
+          } else {
+            alertContainer.innerHTML = '';
+          }
+
+          // Active Team Stats
+          const hiredDevsCount = projects.filter(p => p.hired_freelancer_id !== null).length;
+          const openAppsCount = projects.reduce((acc, p) => acc + (p.application_count || 0), 0);
+          document.getElementById('hired-devs-count').textContent = hiredDevsCount;
+          document.getElementById('collab-teams-count').textContent = teams.length;
+          document.getElementById('open-apps-count').textContent = openAppsCount;
+
+          // Wallet Top Up Click
+          document.getElementById('topup-btn').onclick = async () => {
+            const amountInput = document.getElementById('topup-amount');
+            const amountVal = parseFloat(amountInput.value);
+            if (!amountVal || amountVal <= 0 || amountVal > 5000) {
+              showToast("Enter a valid amount between 1 and 5000 Credits", "error");
+              return;
+            }
+            try {
+              showToast("Adding virtual credits...", "info");
+              await API.post('/wallet/add-funds', { amount: amountVal });
+              showToast(`Successfully added ${amountVal} Credits to wallet!`, "success");
+              amountInput.value = '';
+              load();
+            } catch (err) {
+              showToast("Wallet deposit failed: " + err.message, "error");
+            }
+          };
+
+          // Pipeline bar
+          const t = projects.length || 1;
+          document.getElementById('pipe-bar').innerHTML = `
+            <div class="pipe-seg" style="width:${(open/t)*100}%;background:var(--success)"></div>
+            <div class="pipe-seg" style="width:${(prog/t)*100}%;background:var(--warning)"></div>
+            <div class="pipe-seg" style="width:${(sub/t)*100}%;background:var(--accent)"></div>
+            <div class="pipe-seg" style="width:${((done + disp)/t)*100}%;background:var(--text-secondary)"></div>
+          `;
+          document.getElementById('pipe-legend').innerHTML = `
+            <span>🟢 Open <strong>${open}</strong></span>
+            <span>🟡 Progress <strong>${prog}</strong></span>
+            <span>🔵 Review <strong>${sub}</strong></span>
+            <span>⚪ Done <strong>${done}</strong></span>
+            ${disp > 0 ? `<span>🔴 Disputed <strong>${disp}</strong></span>` : ''}
+          `;
+
+          const sw = document.getElementById('sidebar-wallet-value');
+          if (sw) sw.textContent = user.wallet_balance.toFixed(2) + ' Cr';
+
+          drawChart(history);
+
+          if (!projects.length) {
+            tbl.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);padding:2rem">No projects yet. Launch your first campaign!</td></tr>';
+            return;
+          }
+
+          projects.reverse();
+          tbl.innerHTML = projects.map(p => {
+            let badge = '', action = '';
+            if (p.status === 'open') {
+              badge = '<span class="badge" style="background:rgba(16,185,129,.12);color:var(--success)">Open</span>';
+              action = `<a href="applicants.html?project=${p.id}" class="btn btn-ghost btn-sm" style="font-size:.75rem">Review (${p.application_count||0})</a>`;
+            } else if (p.status === 'in_progress') {
+              badge = '<span class="badge" style="background:rgba(245,158,11,.12);color:var(--warning)">In Progress</span>';
+              action = `<a href="workspace.html?project=${p.id}" class="btn btn-ghost btn-sm" style="font-size:.75rem">Workspace</a>`;
+            } else if (p.status === 'submitted') {
+              badge = '<span class="badge" style="background:rgba(13,148,136,.12);color:var(--accent)">Review</span>';
+              action = `<a href="workspace.html?project=${p.id}" class="btn btn-primary btn-sm" style="font-size:.75rem">Review</a>`;
+            } else if (p.status === 'disputed' || p.status === 'Disputed') {
+              badge = '<span class="badge" style="background:rgba(239,68,68,.12);color:var(--danger)">Disputed</span>';
+              action = `<a href="disputes.html" class="btn btn-ghost btn-sm" style="font-size:.75rem; border-color:var(--danger); color:var(--danger)">Mediate</a>`;
+            } else {
+              badge = '<span class="badge" style="background:rgba(16,185,129,.12);color:var(--success)">Done</span>';
+              action = '<span style="font-size:.78rem;color:var(--text-secondary)">Settled</span>';
+            }
+            return `<tr>
+              <td><strong style="font-size:.88rem">${p.title}</strong></td>
+              <td style="font-weight:600;font-size:.88rem">${formatMoney(p.budget)}</td>
+              <td>${badge}</td>
+              <td>${action}</td>
+            </tr>`;
+          }).join('');
+
+        } catch (err) {
+          showToast('Error: ' + err.message, 'error');
+        }
+      }
+      load();
+    });
+  </script>
+</body>
+</html>

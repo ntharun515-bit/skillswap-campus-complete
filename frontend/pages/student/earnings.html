@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Freelancer Earnings Center | SkillSwap</title>
+  <link rel="stylesheet" href="/frontend/css/variables.css">
+  <link rel="stylesheet" href="/frontend/css/main.css">
+  <link rel="stylesheet" href="/frontend/css/dashboard.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  <style>
+    .glowing-earnings {
+      background: radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.15) 0%, rgba(2, 12, 11, 0.75) 100%) !important;
+      border: 1px solid rgba(16, 185, 129, 0.3) !important;
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.15);
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="/frontend/js/config.js"></script>
+  <script src="/frontend/js/toast.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/auth.js"></script>
+  <script src="/frontend/js/components.js"></script>
+  <script src="/frontend/js/socket.js"></script>
+  <script src="/frontend/js/dashboard-layout.js"></script>
+
+  <script>
+    initDashboard('student', 'earnings', 'Earnings', function(el) {
+      el.innerHTML = `
+        <!-- Stats summary row -->
+        <div class="stats-grid" id="student-stats-row">
+          <div class="glass card skeleton" style="height:110px"></div>
+          <div class="glass card skeleton" style="height:110px"></div>
+          <div class="glass card skeleton" style="height:110px"></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 340px;gap:1.5rem;margin-top:1.5rem">
+          
+          <div style="display:flex;flex-direction:column;gap:1.5rem">
+            <!-- Pending Escrow Milestones -->
+            <article class="glass card">
+              <h3 style="font-family:var(--font-heading);margin-bottom:1rem">🔒 Locked Developer Escrows</h3>
+              <div id="student-escrow-milestones-list" style="display:flex;flex-direction:column;gap:0.75rem">
+                <div class="skeleton" style="height:65px"></div>
+              </div>
+            </article>
+
+            <!-- Complete Ledger Table -->
+            <article class="glass card">
+              <h3 style="font-family:var(--font-heading);margin-bottom:1rem">🧾 Complete Ledger History</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Ref Code</th>
+                      <th>Date</th>
+                      <th>Sender</th>
+                      <th>Amount</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="student-transaction-ledger">
+                    <tr><td colspan="5" style="text-align:center;color:var(--text-secondary)">Syncing ledger...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <!-- Withdrawal Requests History -->
+            <article class="glass card">
+              <h3 style="font-family:var(--font-heading);margin-bottom:1rem">💸 Payout Withdrawal Log</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Amount</th>
+                      <th>Method</th>
+                      <th>Requested At</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="payout-requests-log-tbody">
+                    <tr><td colspan="5" style="text-align:center;color:var(--text-secondary)">Syncing withdrawal history...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+          </div>
+
+          <div style="display:flex;flex-direction:column;gap:1.5rem">
+            <!-- Request Withdrawal Payout Panel -->
+            <article class="glass card glowing-earnings">
+              <h3 style="font-family:var(--font-heading);color:var(--success);margin-bottom:0.25rem">💸 Request Withdrawal</h3>
+              <p style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:1.25rem">Initiate manual transfer of your cleared virtual earnings.</p>
+              
+              <div style="margin-bottom:0.75rem">
+                <label style="font-size:0.75rem;color:var(--text-secondary);display:block;margin-bottom:0.4rem">Select Payout Method:</label>
+                <select id="withdrawal-method-select" class="form-control" style="background:rgba(0,0,0,0.3)">
+                  <option value="PayPal">PayPal Instant Payout</option>
+                  <option value="Bank Transfer">Direct Bank Transfer</option>
+                  <option value="Venmo">Venmo Instant Wallet</option>
+                </select>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:0.5rem;margin-bottom:1.25rem">
+                <label style="font-size:0.75rem;color:var(--text-secondary)">Enter Payout Amount ($10 min):</label>
+                <div style="display:flex;gap:0.5rem">
+                  <input type="number" id="withdrawal-amount-input" class="form-control" placeholder="Amount" min="10" max="2000" style="background:rgba(0,0,0,0.3)">
+                  <button onclick="executeWithdrawalRequest()" class="btn btn-primary">Withdraw</button>
+                </div>
+              </div>
+            </article>
+
+            <!-- Earnings Growth Analytics -->
+            <article class="glass card" style="padding:1.25rem">
+              <h3 style="font-family:var(--font-heading);margin-bottom:1rem">📊 Earnings Growth</h3>
+              <div style="height:200px;position:relative">
+                <canvas id="student-earnings-chart"></canvas>
+              </div>
+            </article>
+
+            <!-- Virtual Earnings Ledger info -->
+            <article class="glass card" style="background:rgba(255,255,255,0.01)">
+              <h4 style="font-size:0.85rem;margin-bottom:0.5rem">🔐 Platform Clearances</h4>
+              <div style="font-size:0.75rem;color:var(--text-secondary);line-height:1.5">
+                <p style="margin-bottom:0.5rem">✔️ Active earnings represent fully cleared virtual platform credits.</p>
+                <p style="margin-bottom:0.5rem">✔️ When a withdrawal is filed, payout credits are held in blocked status until manually approved by admin.</p>
+                <p>✔️ Platform approval typically completes within 2-4 campus business hours.</p>
+              </div>
+            </article>
+          </div>
+
+        </div>
+      `;
+
+      let earningsChart = null;
+
+      // Submit payout withdrawal request
+      window.executeWithdrawalRequest = function() {
+        const input = document.getElementById('withdrawal-amount-input');
+        const method = document.getElementById('withdrawal-method-select').value;
+        const amount = parseFloat(input.value);
+
+        if (!amount || amount < 10 || amount > 2000) {
+          showToast('Please specify a payout amount between $10 and $2000.', 'warning');
+          return;
+        }
+
+        API.post('/withdrawals/request', { amount, method }).then(res => {
+          showToast('💸 Payout request successfully filed! Awaiting administrative verification.', 'success');
+          input.value = '';
+          loadEarningsDesk();
+        }).catch(err => {
+          showToast('Payout failed: ' + err.message, 'error');
+        });
+      };
+
+      function renderEarningsChart(txs) {
+        const ctx = document.getElementById('student-earnings-chart').getContext('2d');
+        
+        // Accumulate earnings chronologically
+        const completedPayouts = txs.filter(t => t.type === 'escrow_release').reverse();
+        
+        let cumulative = 0;
+        const dataPoints = [];
+        const labels = [];
+
+        completedPayouts.forEach((t, idx) => {
+          cumulative += t.amount;
+          dataPoints.push(cumulative);
+          labels.push(`P-${idx + 1}`);
+        });
+
+        if (earningsChart) {
+          earningsChart.destroy();
+        }
+
+        if (typeof Chart === 'undefined') {
+          setTimeout(() => renderEarningsChart(txs), 500);
+          return;
+        }
+
+        earningsChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels.length > 0 ? labels : ['Start'],
+            datasets: [{
+              label: 'Cumulative Growth',
+              data: dataPoints.length > 0 ? dataPoints : [0],
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              fill: true,
+              tension: 0.3,
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false }
+            },
+            scales: {
+              x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+              y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
+            }
+          }
+        });
+      }
+
+      function loadEarningsDesk() {
+        Promise.all([
+          API.get('/wallet/balance'),
+          API.get('/payments/history'),
+          API.get('/admin/withdrawals').catch(() => ({ withdrawals: [] }))  // fallback if endpoint returns 403 (for non-admin, just query standard user history if exists, or withdrawals is empty list)
+        ]).then(([bal, history, adminData]) => {
+          const w = bal.wallet;
+          
+          // Render stats cards
+          document.getElementById('student-stats-row').innerHTML = `
+            <article class="glass stat-card" style="border-left:4px solid var(--success)">
+              <span class="label">💳 Cleared Earnings</span>
+              <span class="value" style="color:var(--success)" id="student-wallet-bal">$${w.balance.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+            </article>
+            <article class="glass stat-card" style="border-left:4px solid #f59e0b">
+              <span class="label">🔒 Blocked / Pending Payouts</span>
+              <span class="value" style="color:#f59e0b">$${w.pending_balance.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+            </article>
+            <article class="glass stat-card" style="border-left:4px solid var(--accent)">
+              <span class="label">📈 Lifetime Earnings</span>
+              <span class="value" style="color:var(--accent)">$${w.total_earned.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+            </article>
+          `;
+
+          // Render active escrows list
+          const activeEscrows = history.escrows.filter(e => e.status === 'Escrowed');
+          const escrowList = document.getElementById('student-escrow-milestones-list');
+          
+          if (activeEscrows.length === 0) {
+            escrowList.innerHTML = `
+              <div style="padding:1.5rem;text-align:center;color:var(--text-secondary)">
+                <p>No active locked escrows for your assigned projects.</p>
+              </div>
+            `;
+          } else {
+            escrowList.innerHTML = activeEscrows.map(e => `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:var(--radius-md)">
+                <div>
+                  <h4 style="font-size:0.88rem;font-weight:700">${e.project_title}</h4>
+                  <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.15rem">Escrow Payer: <strong>${e.client_name}</strong></div>
+                  <div style="font-size:0.85rem;color:var(--success);font-weight:700;margin-top:0.25rem">$${e.amount.toLocaleString()} Cr</div>
+                </div>
+                <span class="badge badge-warning" style="font-size:0.7rem;padding:0.3rem 0.6rem">🔒 Locked in Escrow</span>
+              </div>
+            `).join('');
+          }
+
+          // Render transaction ledger
+          const ledger = document.getElementById('student-transaction-ledger');
+          if (history.transactions.length === 0) {
+            ledger.innerHTML = `
+              <tr>
+                <td colspan="5" style="text-align:center;padding:2rem;color:var(--text-secondary)">No financial transactions registered.</td>
+              </tr>
+            `;
+          } else {
+            ledger.innerHTML = history.transactions.map(t => {
+              let typeBadge = '';
+              if (t.type === 'deposit') typeBadge = '<span class="badge badge-success">DEPOSIT</span>';
+              else if (t.type === 'escrow_lock') typeBadge = '<span class="badge badge-warning">ESCROW LOCK</span>';
+              else if (t.type === 'escrow_release') typeBadge = '<span class="badge badge-success">PAYOUT</span>';
+              else if (t.type === 'withdrawal') typeBadge = '<span class="badge badge-danger">WITHDRAWAL</span>';
+              else if (t.type === 'refund') typeBadge = '<span class="badge badge-info">REFUND</span>';
+
+              const amountColor = t.type === 'escrow_release' || t.type === 'refund' ? 'var(--success)' : 'var(--danger)';
+              const prefix = t.type === 'escrow_release' || t.type === 'refund' ? '+' : '-';
+
+              return `
+                <tr>
+                  <td style="font-family:monospace;font-size:0.8rem">${t.reference_code}</td>
+                  <td style="font-size:0.8rem;color:var(--text-secondary)">${new Date(t.created_at).toLocaleDateString()}</td>
+                  <td style="font-size:0.82rem">${t.sender_name}</td>
+                  <td style="font-weight:900;color:${amountColor}">${prefix}$${t.amount.toFixed(2)}</td>
+                  <td style="font-size:0.8rem;text-transform:capitalize">${t.status}</td>
+                </tr>
+              `;
+            }).join('');
+          }
+
+          // Render payout requests logs list (we can filter general transactions of type withdrawal, or display withdrawal history if adminData returned)
+          const pLogs = document.getElementById('payout-requests-log-tbody');
+          const payouts = adminData && adminData.withdrawals ? adminData.withdrawals.filter(w => w.user_id === w.user_id) : []; // wait, user sees their own
+          
+          API.get('/wallet/balance').then(() => {
+            // Alternatively let's filter history transactions for payouts
+            const wTxs = history.transactions.filter(t => t.type === 'withdrawal');
+            
+            if (wTxs.length === 0) {
+              pLogs.innerHTML = `
+                <tr>
+                  <td colspan="5" style="text-align:center;padding:1.5rem;color:var(--text-secondary)">No completed payout requests.</td>
+                </tr>
+              `;
+            } else {
+              pLogs.innerHTML = wTxs.map(w => `
+                <tr>
+                  <td style="font-family:monospace;font-size:0.75rem">${w.reference_code}</td>
+                  <td style="font-weight:700;color:var(--danger)">$${w.amount.toFixed(2)}</td>
+                  <td style="font-size:0.8rem">${w.description.includes('PayPal') ? 'PayPal' : w.description.includes('Bank') ? 'Bank Transfer' : 'Venmo'}</td>
+                  <td style="font-size:0.78rem;color:var(--text-secondary)">${new Date(w.created_at).toLocaleDateString()}</td>
+                  <td><span class="badge badge-success" style="font-size:0.68rem">Processed</span></td>
+                </tr>
+              `).join('');
+            }
+          });
+
+          // Render growth stats line graph
+          renderEarningsChart(history.transactions);
+
+        }).catch(err => {
+          showToast('Earnings fetch failed: ' + err.message, 'error');
+        });
+      }
+
+      loadEarningsDesk();
+
+      // Listen for WebSocket balance updates
+      const sock = initSocket();
+      if (sock) {
+        sock.on('wallet_updated', (data) => {
+          const balEl = document.getElementById('student-wallet-bal');
+          if (balEl) {
+            balEl.style.transition = 'text-shadow 0.3s ease';
+            balEl.style.textShadow = '0 0 15px var(--success)';
+            setTimeout(() => {
+              balEl.style.textShadow = 'none';
+            }, 800);
+          }
+          loadEarningsDesk();
+        });
+        
+        sock.on('payment_notification', (data) => {
+          showToast(`💰 Payout Alert: ${data.title} - ${data.message}`, 'success');
+        });
+      }
+    });
+  </script>
+</body>
+</html>
