@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/frontend/css/variables.css">
   <link rel="stylesheet" href="/frontend/css/main.css">
   <link rel="stylesheet" href="/frontend/css/dashboard.css">
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <style>
     .sdash{display:grid;grid-template-columns:1fr 310px;gap:1.5rem;margin-top:1.25rem}
     @media(max-width:960px){.sdash{grid-template-columns:1fr}}
@@ -148,26 +148,32 @@
               </svg>
             </article>
 
+            <!-- Hired Workspaces -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 style="font-size:1rem;margin-bottom:.75rem">💼 Hired Project Workdesks</h3>
+              <div id="hired-projects-container" style="display:flex;flex-direction:column;gap:0.5rem">
+                <div class="skeleton" style="height:50px"></div>
+              </div>
+            </article>
+
             <!-- Milestone Checklist -->
             <article class="glass card" style="padding:1.25rem 1.5rem">
-              <h3 style="font-size:1rem;margin-bottom:.75rem">Active Milestone Checkpoints</h3>
-              <div id="milestones-container">
-                <div class="milestone-item">
-                  <input type="checkbox" checked class="milestone-checkbox" disabled>
-                  <span style="text-decoration:line-through; color:var(--text-secondary)">Verify initial project requirements & specs</span>
-                </div>
-                <div class="milestone-item">
-                  <input type="checkbox" checked class="milestone-checkbox" disabled>
-                  <span style="text-decoration:line-through; color:var(--text-secondary)">Build frontend layout and dark obsidian wireframes</span>
-                </div>
-                <div class="milestone-item">
-                  <input type="checkbox" class="milestone-checkbox" id="m3" onchange="showToast('Checkpoint progress saved!', 'success')">
-                  <span>Connect backend Flask routers & DB triggers</span>
-                </div>
-                <div class="milestone-item">
-                  <input type="checkbox" class="milestone-checkbox" id="m4" onchange="showToast('Final release requested!', 'info')">
-                  <span>Submit final project build and request escrow release</span>
-                </div>
+              <h3 style="font-size:1rem;margin-bottom:.75rem">🎯 Active Milestone Checkpoints</h3>
+              <div id="milestones-container" style="display:flex;flex-direction:column;gap:0.4rem">
+                <div class="skeleton" style="height:50px"></div>
+              </div>
+            </article>
+
+            <!-- Submitted Proposals (Bids) -->
+            <article class="glass card" style="padding:1.25rem 1.5rem">
+              <h3 style="font-size:1rem;margin-bottom:.75rem">📝 My Active Proposals (Bids)</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Project Title</th><th>Proposed Rate</th><th>Status</th><th>Submitted</th></tr></thead>
+                  <tbody id="bids-body">
+                    <tr><td colspan="4" style="text-align:center">Loading bids...</td></tr>
+                  </tbody>
+                </table>
               </div>
             </article>
 
@@ -320,8 +326,10 @@
         API.get('/ai/project-matches').catch(() => []),
         API.get('/users/leaderboard').catch(() => []),
         API.get('/payments/history').catch(() => []),
-        API.get('/projects/saved').catch(() => [])
-      ]).then(([user, matches, lb, history, savedList]) => {
+        API.get('/projects/saved').catch(() => []),
+        API.get('/projects/applications/my').catch(() => []),
+        API.get('/projects/my').catch(() => [])
+      ]).then(([user, matches, lb, history, savedList, bidsList, hiredList]) => {
 
         const p = user.profile || {};
         const xp = p.xp || 0;
@@ -434,6 +442,102 @@
             <div style="font-size:.72rem; color:var(--text-secondary)">Verified Level: ${level}. Recommends: Python Developer, AI Prompt Eng.</div>
           </div>
         `;
+
+        // Hired Projects (Active Workspaces)
+        const hiredContainer = document.getElementById('hired-projects-container');
+        if (hiredList.length === 0) {
+          hiredContainer.innerHTML = '<span style="font-size:0.82rem;color:var(--text-secondary)">No active hired projects yet. Browse open projects to get hired!</span>';
+          document.getElementById('milestones-container').innerHTML = '<span style="font-size:0.82rem;color:var(--text-secondary)">No active checkpoints. Workdesk milestones will appear here once hired!</span>';
+        } else {
+          hiredContainer.innerHTML = hiredList.map(hp => {
+            let statusBadge = '';
+            if (hp.status === 'in_progress') {
+              statusBadge = '<span class="badge" style="background:rgba(245,158,11,.12);color:var(--warning);font-size:0.68rem;margin-left:0.5rem">In Progress</span>';
+            } else if (hp.status === 'submitted') {
+              statusBadge = '<span class="badge" style="background:rgba(13,148,136,.12);color:var(--accent);font-size:0.68rem;margin-left:0.5rem">In Review</span>';
+            } else if (hp.status === 'completed') {
+              statusBadge = '<span class="badge" style="background:rgba(16,185,129,.12);color:var(--success);font-size:0.68rem;margin-left:0.5rem">Completed</span>';
+            } else if (hp.status === 'disputed' || hp.status === 'Disputed') {
+              statusBadge = '<span class="badge" style="background:rgba(239,68,68,.12);color:var(--danger);font-size:0.68rem;margin-left:0.5rem">Disputed</span>';
+            }
+            
+            return `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0.85rem;border-radius:var(--radius-md);border:1px solid var(--border);background:rgba(255,255,255,0.01)">
+                <div>
+                  <strong style="font-size:0.88rem;color:var(--text-primary);display:flex;align-items:center;flex-wrap:wrap;gap:0.25rem;line-height:1.3">
+                    ${hp.title} ${statusBadge}
+                  </strong>
+                  <span style="font-size:0.75rem;color:var(--text-secondary)">Client: ${hp.client_name || 'Campus Partner'} · Budget: ${formatMoney(hp.budget)}</span>
+                </div>
+                <a href="workspace.html?project=${hp.id}" class="btn btn-primary btn-sm" style="font-size:0.72rem;padding:0.35rem 0.75rem">
+                  ${hp.status === 'completed' ? 'View Workdesk' : 'Launch Workdesk →'}
+                </a>
+              </div>
+            `;
+          }).join('');
+
+          // Load milestones from first ACTIVE project if exists, otherwise first completed project
+          const activeProj = hiredList.find(hp => hp.status === 'in_progress' || hp.status === 'submitted') || hiredList[0];
+          
+          window.refreshDashboardMilestones = function(projectId) {
+            API.get(`/projects/${projectId}/kanban`).then(tasks => {
+              const container = document.getElementById('milestones-container');
+              if (!tasks || tasks.length === 0) {
+                container.innerHTML = `<span style="font-size:0.82rem;color:var(--text-secondary)">No tasks created on "${activeProj.title}" Kanban Board yet.</span>`;
+                return;
+              }
+              container.innerHTML = tasks.map(t => {
+                const isDone = t.column === 'done';
+                const decoration = isDone ? 'line-through' : 'none';
+                const opacity = isDone ? 'color:var(--text-secondary)' : '';
+                return `
+                  <div class="milestone-item">
+                    <input type="checkbox" ${isDone ? 'checked' : ''} class="milestone-checkbox" onchange="toggleDashboardMilestone(${t.id}, '${t.column}', ${projectId})">
+                    <span style="text-decoration:${decoration}; ${opacity}">${t.title}</span>
+                  </div>
+                `;
+              }).join('');
+            }).catch(() => {
+              document.getElementById('milestones-container').innerHTML = '<span style="font-size:0.82rem;color:var(--text-secondary)">Failed to load task checkpoints.</span>';
+            });
+          };
+
+          window.toggleDashboardMilestone = function(taskId, currentColumn, projectId) {
+            const nextCol = currentColumn === 'done' ? 'todo' : 'done';
+            API.put(`/projects/kanban/${taskId}`, { column: nextCol }).then(() => {
+              showToast('Milestone checkpoint updated successfully!', 'success');
+              refreshDashboardMilestones(projectId);
+            }).catch(err => showToast(err.message, 'error'));
+          };
+
+          refreshDashboardMilestones(activeProj.id);
+        }
+
+        // Active Proposals (Bids)
+        const bidsBody = document.getElementById('bids-body');
+        if (bidsList.length === 0) {
+          bidsBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);font-size:0.82rem">No submitted proposals.</td></tr>';
+        } else {
+          bidsBody.innerHTML = bidsList.map(b => {
+            const rate = b.proposed_rate ? formatMoney(b.proposed_rate) : 'Standard';
+            let badge = '';
+            if (b.status === 'accepted') {
+              badge = '<span class="badge" style="background:rgba(16,185,129,.12);color:var(--success)">Hired</span>';
+            } else if (b.status === 'rejected') {
+              badge = '<span class="badge" style="background:rgba(239,68,68,.12);color:var(--danger)">Declined</span>';
+            } else {
+              badge = '<span class="badge" style="background:rgba(245,158,11,.12);color:var(--warning)">Pending</span>';
+            }
+            return `
+              <tr>
+                <td><strong style="font-size:0.85rem">${b.project_title}</strong></td>
+                <td style="font-weight:600;font-size:0.85rem;color:var(--success)">${rate}</td>
+                <td>${badge}</td>
+                <td style="font-size:0.75rem;color:var(--text-secondary)">${formatDate(b.created_at)}</td>
+              </tr>
+            `;
+          }).join('');
+        }
 
         drawEarningsChart(history);
 

@@ -31,9 +31,27 @@ def save_upload(file, subfolder, allowed_extensions):
 
 def create_notification(user_id, title, message, ntype="info", link=None, priority="normal"):
     from backend.models import Notification
-    from backend.extensions import db
+    from backend.extensions import db, socketio
 
     n = Notification(user_id=user_id, title=title, message=message, type=ntype, link=link, priority=priority)
     db.session.add(n)
     db.session.commit()
+    
+    try:
+        socketio.emit(
+            "notification",
+            {
+                "id": n.id,
+                "title": title,
+                "message": message,
+                "type": ntype,
+                "link": link,
+                "priority": priority,
+                "created_at": n.created_at.isoformat() if n.created_at else None
+            },
+            room=f"user_{user_id}"
+        )
+    except Exception:
+        pass
+        
     return n

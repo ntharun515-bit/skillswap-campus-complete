@@ -103,7 +103,7 @@
 
     function loadDisputesData() {
       Promise.all([
-        API.get('/api/disputes'),
+        API.get('/disputes'),
         API.get('/projects/my')
       ]).then(([disputes, projects]) => {
         
@@ -159,7 +159,7 @@
         return;
       }
 
-      API.post('/api/disputes', {
+      API.post('/disputes', {
         project_id: pid,
         title: title,
         reason: reason,

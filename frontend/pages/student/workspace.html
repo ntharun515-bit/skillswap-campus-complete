@@ -236,7 +236,8 @@
 
   <script src="/frontend/js/config.js"></script>
   <script src="/frontend/js/toast.js"></script>
-  <script src="/frontend/js/theme.js"></  <script src="/frontend/js/api.js"></script>
+  <script src="/frontend/js/theme.js"></script>
+  <script src="/frontend/js/api.js"></script>
   <script src="/frontend/js/auth.js"></script>
   <script src="/frontend/js/components.js"></script>
   <script src="/frontend/js/socket.js"></script>
@@ -757,6 +758,616 @@
       });
     }
 
+    // =========================================================================
+    // 📤 DELIVERABLES SUBMISSION & DISPUTE HANDLERS
+    // =========================================================================
+    function openDeliverablesModal() {
+      document.getElementById('deliver-modal').style.display = 'flex';
+    }
+
+    function closeDeliverModal() {
+      document.getElementById('deliver-modal').style.display = 'none';
+    }
+
+    function submitProjectDeliverable() {
+      const pid = document.getElementById('workspace-project-select').value;
+      const url = document.getElementById('deliver-preview-url').value.trim();
+      const note = document.getElementById('deliver-note').value.trim();
+
+      if (!url) {
+        showToast('Deliverable URL is required!', 'warning');
+        return;
+      }
+
+      API.post(`/projects/${pid}/submit`, {
+        preview_url: url,
+        note: note || "Work deliverables submitted for client review."
+      }).then(() => {
+        showToast('🚀 Work deliverables successfully submitted for review!', 'success');
+        closeDeliverModal();
+        
+        // Reset modal fields
+        document.getElementById('deliver-preview-url').value = '';
+        document.getElementById('deliver-note').value = '';
+
+        refreshWorkspaceData(pid);
+      }).catch(err => {
+        showToast('Submission failed: ' + err.message, 'error');
+      });
+    }
+
+    function wsSubmitWork() {
+      const pid = document.getElementById('workspace-project-select').value;
+      const url = document.getElementById('ws-deliver-url').value.trim();
+      const note = document.getElementById('ws-deliver-note').value.trim();
+
+      if (!url) {
+        showToast('Deliverable URL is required!', 'warning');
+        return;
+      }
+
+      API.post(`/projects/${pid}/submit`, {
+        preview_url: url,
+        note: note || "Work deliverables submitted for client review."
+      }).then(() => {
+        showToast('🚀 Deliverables submitted successfully!', 'success');
+        document.getElementById('ws-deliver-url').value = '';
+        document.getElementById('ws-deliver-note').value = '';
+        refreshWorkspaceData(pid);
+      }).catch(err => {
+        showToast('Submission failed: ' + err.message, 'error');
+      });
+    }
+
+    function triggerMilestoneDispute() {
+      const pid = document.getElementById('workspace-project-select').value;
+      const title = prompt("Enter Dispute Title / Main issue:");
+      if (!title) return;
+      const reason = prompt("Describe the issue in detail for Admin mediation:");
+      if (!reason) return;
+      
+      API.post('/disputes', {
+        project_id: pid,
+        title: title,
+        reason: reason,
+        evidence_url: "Student workspace files"
+      }).then(() => {
+        showToast('⚠️ Contract flagged under Disputed. Payout lock holds active.', 'error');
+        refreshWorkspaceData(pid);
+      }).catch(err => {
+        showToast('Failed to file dispute: ' + err.message, 'error');
+      });
+    }
+
+    // =========================================================================
+    // 💬 WORKSPACE CHAT LOGIC (Socket.IO Real-time Chat)
+    // =========================================================================
+    let wsConvId = null;
+    let wsMeId = null;
+    let wsTypingTimeout = null;
+
+    function wsInitChat(project) {
+      const me = getUser();
+      wsMeId = me.id;
+      const otherId = project.client_id;
+      if (!otherId) return;
+      
+      document.getElementById('ws-other-name').textContent = '— Client';
+
+      API.post('/chat/conversations', { user_id: otherId, project_id: project.id })
+        .then(res => {
+          wsConvId = res.conversation_id;
+          wsLoadMessages();
+          const sock = initSocket();
+          if (sock) {
+            joinConversation(wsConvId);
+            onNewMessage(msg => {
+              if (msg.conversation_id === wsConvId) wsAppendMessage(msg);
+            });
+            sock.on('typing', d => {
+              if (d.conversation_id === wsConvId && d.user_id !== wsMeId)
+                document.getElementById('ws-typing-indicator').textContent = 'Client is typing…';
+            });
+            sock.on('stop_typing', d => {
+              if (d.conversation_id === wsConvId)
+                document.getElementById('ws-typing-indicator').textContent = '';
+            });
+          }
+        }).catch(() => {});
+
+      wsUpdateSubmitPanel(project);
+    }
+
+    function wsLoadMessages() {
+      if (!wsConvId) return;
+      API.get(`/chat/conversations/${wsConvId}/messages`)
+        .then(msgs => {
+          const box = document.getElementById('ws-chat-messages');
+          if (!msgs.length) {
+            box.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;text-align:center;padding-top:2rem">No messages yet. Start the conversation! 🗨️</p>';
+            return;
+          }
+          box.innerHTML = '';
+          msgs.forEach(m => wsAppendMessage(m, false));
+          box.scrollTop = box.scrollHeight;
+        }).catch(() => {});
+    }
+
+    function wsAppendMessage(msg, scroll = true) {
+      const box = document.getElementById('ws-chat-messages');
+      if (box.querySelector('p')) box.innerHTML = '';
+      const div = document.createElement('div');
+      div.className = 'ws-msg ' + (msg.sender_id === wsMeId ? 'sent' : 'recv');
+      const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+      div.innerHTML = `${escapeHtml(msg.content)}<div class="msg-meta">${msg.sender_name||''} · ${time}</div>`;
+      box.appendChild(div);
+      if (scroll) box.scrollTop = box.scrollHeight;
+    }
+
+    function wsChatKeydown(e) {
+      if (e.key === 'Enter') { wsSendMsg(); return; }
+      emitTyping(wsConvId);
+      clearTimeout(wsTypingTimeout);
+      wsTypingTimeout = setTimeout(() => emitStopTyping(wsConvId), 1500);
+    }
+
+    function wsSendMsg() {
+      const input = document.getElementById('ws-chat-input');
+      const text = input.value.trim();
+      if (!text || !wsConvId) return;
+      sendSocketMessage(wsConvId, text);
+      wsAppendMessage({ sender_id: wsMeId, content: text, sender_name: 'You', created_at: new Date().toISOString() });
+      input.value = '';
+      emitStopTyping(wsConvId);
+    }
+
+    function wsUpdateSubmitPanel(project) {
+      const statusEl = document.getElementById('ws-submit-status');
+      const formEl = document.getElementById('ws-submit-form');
+      if (project.status === 'submitted') {
+        statusEl.innerHTML = `
+          <div style="padding:0.75rem;border:1px solid var(--warning);border-radius:var(--radius-md);background:rgba(245,158,11,0.06);font-size:0.85rem">
+            <span style="font-weight:700;color:var(--warning)">⏳ Deliverables Submitted</span>
+            <p style="margin-top:0.25rem;color:var(--text-secondary)">Awaiting client review and release of Escrow funds.</p>
+          </div>`;
+        formEl.style.display = 'none';
+      } else if (project.status === 'completed') {
+        statusEl.innerHTML = `
+          <div style="padding:0.75rem;border:1px solid var(--success);border-radius:var(--radius-md);background:rgba(16,185,129,0.06);font-size:0.85rem">
+            <span style="font-weight:700;color:var(--success)">✅ Contract Settled</span>
+            <p style="margin-top:0.25rem;color:var(--text-secondary)">All credits successfully released to your wallet!</p>
+          </div>`;
+        formEl.style.display = 'none';
+      } else {
+        statusEl.innerHTML = '';
+        formEl.style.display = 'block';
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // =========================================================================
+    // 👥 STUDENT SQUAD TEAM HUB (TAB 2 LOGIC)
+    // =========================================================================
+    let currentTeamId = null;
+    let teamConvId = null;
+    let teamTypingTimeout = null;
+
+    async function loadStudentTeams() {
+      try {
+        const teams = await API.get('/teams');
+        const container = document.getElementById('teams-list-group');
+        
+        if (teams.length === 0) {
+          container.innerHTML = `<p style="color:var(--text-secondary);font-size:0.82rem;text-align:center;padding:1rem 0">Not in any dev collectives.</p>`;
+          return;
+        }
+
+        container.innerHTML = teams.map(t => {
+          const isActive = t.id === currentTeamId ? 'active' : '';
+          const leadLabel = t.created_by === getUser().id ? '👑 Leader' : 'Developer';
+          return `
+            <div class="conv-item-card ${isActive}" onclick="viewTeamHubDetails(${t.id})" style="padding:0.65rem 0.85rem">
+              <div style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,0.02);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700;color:var(--accent);flex-shrink:0">
+                ${t.name.slice(0, 2).toUpperCase()}
+              </div>
+              <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
+                <strong style="font-size:0.85rem;color:var(--text-primary);display:block">${t.name}</strong>
+                <span style="font-size:0.68rem;color:var(--text-secondary)">${leadLabel} · ${t.members.length} members</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        showToast('Failed to load squads: ' + err.message, 'error');
+      }
+    }
+
+    async function loadTeamInvitations() {
+      try {
+        const invites = await API.get('/teams/invitations');
+        const container = document.getElementById('team-invitations-list');
+        
+        if (invites.length === 0) {
+          container.innerHTML = `<p style="color:var(--text-secondary);font-size:0.82rem;text-align:center;padding:0.5rem 0">No pending invites.</p>`;
+          return;
+        }
+
+        container.innerHTML = invites.map(inv => `
+          <div class="glass card" style="padding:0.75rem;display:flex;flex-direction:column;gap:0.5rem;border-color:rgba(13,148,136,0.3)">
+            <span style="font-size:0.78rem;font-weight:700">${inv.team_name}</span>
+            <span style="font-size:0.72rem;color:var(--text-secondary)">From: ${inv.sender_name}</span>
+            <div style="display:flex;gap:0.4rem;margin-top:0.25rem">
+              <button class="btn btn-primary btn-sm" onclick="acceptInvitation(${inv.id})" style="font-size:0.68rem;padding:0.2rem 0.5rem;flex:1">Accept</button>
+              <button class="btn btn-ghost btn-sm" onclick="rejectInvitation(${inv.id})" style="font-size:0.68rem;padding:0.2rem 0.5rem;flex:1">Decline</button>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        showToast('Failed to load team invitations: ' + err.message, 'error');
+      }
+    }
+
+    async function createNewTeamCollective() {
+      const nameInput = document.getElementById('new-team-name');
+      const descInput = document.getElementById('new-team-desc');
+      const name = nameInput.value.trim();
+      const desc = descInput.value.trim();
+
+      if (!name) {
+        showToast('Squad name is required FOUNDation parameter!', 'warning');
+        return;
+      }
+
+      try {
+        await API.post('/teams', { name, description: desc });
+        showToast(`🎉 Squad "${name}" founded successfully!`, 'success');
+        nameInput.value = '';
+        descInput.value = '';
+        loadStudentTeams();
+      } catch (err) {
+        showToast('Foundation failed: ' + err.message, 'error');
+      }
+    }
+
+    function acceptInvitation(id) {
+      API.put(`/teams/invitations/${id}`, { action: "accept", role: "Frontend Developer" })
+        .then(() => {
+          showToast('Welcome to the squad! Invitation accepted.', 'success');
+          loadStudentTeams();
+          loadTeamInvitations();
+        }).catch(err => showToast(err.message, 'error'));
+    }
+
+    function rejectInvitation(id) {
+      API.put(`/teams/invitations/${id}`, { action: "reject" })
+        .then(() => {
+          showToast('Invitation declined.', 'info');
+          loadTeamInvitations();
+        }).catch(err => showToast(err.message, 'error'));
+    }
+
+    async function viewTeamHubDetails(teamId) {
+      currentTeamId = teamId;
+      const detailsEl = document.getElementById('team-hub-details-panel');
+      detailsEl.innerHTML = `<div class="skeleton" style="height:400px;width:100%"></div>`;
+
+      // Highlight active sidebar squad item
+      document.querySelectorAll('#teams-list-group .conv-item-card').forEach(card => {
+        // Simple search index check for active
+        card.classList.remove('active');
+      });
+      loadStudentTeams(); // Highlights accurately on redraw next tick
+
+      try {
+        const team = await API.get(`/teams/${teamId}`);
+        const me = getUser();
+        const isLeader = team.created_by === me.id;
+
+        // Fetch hired projects that could be claimed
+        const allProjs = await API.get('/projects/my').catch(() => []);
+        const claimableProjs = allProjs.filter(p => p.status === 'in_progress' && p.hired_freelancer_id === me.id && !p.team_id);
+
+        let leaderActions = '';
+        if (isLeader) {
+          leaderActions = `<button class="btn btn-ghost btn-sm" onclick="disbandTeamCollective(${team.id})" style="border-color:var(--danger);color:var(--danger);font-size:0.75rem">💥 Disband Team</button>`;
+        } else {
+          leaderActions = `<button class="btn btn-ghost btn-sm" onclick="removeTeamMember(${team.id}, ${me.id})" style="border-color:var(--warning);color:var(--warning);font-size:0.75rem">🚪 Leave Team</button>`;
+        }
+
+        detailsEl.innerHTML = `
+          <!-- Collective Header -->
+          <article class="glass card" style="padding:1.25rem 1.5rem">
+            <div style="display:flex;justify-content:space-between;align-items:start;border-bottom:1px solid var(--border);padding-bottom:1rem">
+              <div>
+                <h2 style="font-size:1.35rem;margin:0;color:var(--text-primary)">👥 ${team.name}</h2>
+                <p style="font-size:0.8rem;color:var(--text-secondary);margin-top:0.25rem">${team.description || 'No description established.'}</p>
+                <span style="font-size:0.72rem;color:var(--accent);margin-top:0.4rem;display:block">Founder Leader: <strong>${team.created_by_name}</strong></span>
+              </div>
+              ${leaderActions}
+            </div>
+
+            <!-- Squad grid split -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1.5rem">
+              
+              <!-- Left Squad Grid: Members list -->
+              <div>
+                <h3 style="font-size:0.95rem;margin-bottom:0.75rem">🛡️ Active Crew Members</h3>
+                <div style="display:flex;flex-direction:column;gap:0.5rem" id="crew-list">
+                  ${team.members.map(m => {
+                    const isSelf = m.user_id === me.id;
+                    const canChangeRole = isLeader && !isSelf;
+                    let actions = '';
+                    if (isSelf) {
+                      actions = `<span style="font-size:0.72rem;color:var(--accent)">You</span>`;
+                    } else if (isLeader) {
+                      actions = `
+                        <select onchange="updateTeamRole(${team.id}, ${m.user_id}, this.value)" style="background:var(--bg-primary);border:1px solid var(--border);color:var(--text-primary);font-size:0.68rem;padding:0.15rem;border-radius:var(--radius-sm)">
+                          <option value="Frontend Developer" ${m.role === 'Frontend Developer' ? 'selected' : ''}>Frontend</option>
+                          <option value="Backend Developer" ${m.role === 'Backend Developer' ? 'selected' : ''}>Backend</option>
+                          <option value="UI/UX Designer" ${m.role === 'UI/UX Designer' ? 'selected' : ''}>Designer</option>
+                          <option value="Researcher" ${m.role === 'Researcher' ? 'selected' : ''}>Researcher</option>
+                          <option value="Tester" ${m.role === 'Tester' ? 'selected' : ''}>Tester</option>
+                          <option value="Team Leader" ${m.role === 'Team Leader' ? 'selected' : ''}>Leader</option>
+                        </select>
+                        <button onclick="removeTeamMember(${team.id}, ${m.user_id})" style="background:none;border:none;color:var(--danger);font-size:0.9rem;cursor:pointer" title="Remove Member">×</button>
+                      `;
+                    }
+                    return `
+                      <div style="display:flex;justify-content:space-between;align-items:center;padding:0.5rem 0.75rem;border-radius:var(--radius-sm);background:rgba(255,255,255,0.01);border:1px solid var(--border)">
+                        <div>
+                          <strong style="font-size:0.8rem;display:block;color:var(--text-primary)">${m.user_name}</strong>
+                          <span style="font-size:0.68rem;color:var(--text-secondary)">${m.role}</span>
+                        </div>
+                        <div style="display:flex;gap:0.4rem;align-items:center">
+                          ${actions}
+                        </div>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+
+              <!-- Right Squad Grid: Invitations & Claim workspace -->
+              <div style="display:flex;flex-direction:column;gap:1.25rem">
+                
+                <!-- Invite Peer Form -->
+                <div>
+                  <h3 style="font-size:0.92rem;margin-bottom:0.4rem">✉️ Add Squad Member</h3>
+                  <div style="display:flex;gap:0.4rem">
+                    <input type="email" id="squad-invite-email" placeholder="Enter developer email..." class="form-control" style="font-size:0.8rem;padding:0.4rem">
+                    <button class="btn btn-primary btn-sm" onclick="sendTeamInvite(${team.id})">Invite</button>
+                  </div>
+                </div>
+
+                <!-- Claim/Assign Project Workspace to Team -->
+                <div>
+                  <h3 style="font-size:0.92rem;margin-bottom:0.4rem">💼 Assign Hired Project Workdesk</h3>
+                  <p style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:0.5rem">Lead developers can assign active hired workdesks to the team collective.</p>
+                  ${isLeader ? `
+                    <div style="display:flex;gap:0.4rem">
+                      <select id="claim-project-select" class="form-control" style="font-size:0.8rem;padding:0.4rem">
+                        <option value="">-- Claim Active Project --</option>
+                        ${claimableProjs.map(cp => `<option value="${cp.id}">${cp.title}</option>`).join('')}
+                      </select>
+                      <button class="btn btn-ghost btn-sm" onclick="claimWorkspaceProject(${team.id})">Claim</button>
+                    </div>
+                  ` : `
+                    <span style="font-size:0.75rem;color:var(--warning)">Only the Founder/Team Leader can claim project workdesks.</span>
+                  `}
+                </div>
+
+                <!-- Assigned Projects List -->
+                <div>
+                  <h3 style="font-size:0.88rem;margin-bottom:0.4rem">Active Hired Operations</h3>
+                  <div style="display:flex;flex-direction:column;gap:0.4rem">
+                    ${team.projects && team.projects.length > 0 ? team.projects.map(tp => `
+                      <a href="workspace.html?project=${tp.id}" class="bookmark-card" style="margin:0;text-decoration:none">
+                        <span class="bookmark-title">${tp.title}</span>
+                        <div class="bookmark-meta">
+                          <span style="color:var(--success)">${tp.budget} Cr</span>
+                          <span>${tp.status.toUpperCase()}</span>
+                        </div>
+                      </a>
+                    `).join('') : `<span style="font-size:0.75rem;color:var(--text-secondary)">No active claimed projects.</span>`}
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          </article>
+
+          <!-- Collaborative Squad Room Team Chat Panel -->
+          <div class="glass ws-chat-box" id="team-chat-box" style="margin-top:1rem">
+            <div class="ws-chat-header">💬 Squad Collective Chatroom <span id="team-typing-indicator" style="font-weight:400;font-size:0.78rem;opacity:0.85;margin-left:auto"></span></div>
+            <div class="ws-chat-messages" id="team-chat-messages" style="height: 240px">
+              <p style="color:var(--text-secondary);font-size:0.85rem;text-align:center;padding-top:2rem">Establishing collective frequencies...</p>
+            </div>
+            <div class="ws-chat-input-row">
+              <input type="text" id="team-chat-input" placeholder="Broadcasting message to crew..." onkeydown="teamChatKeydown(event)">
+              <button class="btn btn-primary btn-sm" onclick="teamSendMsg()">Broadcast</button>
+            </div>
+          </div>
+        `;
+
+        teamInitChat(team);
+
+      } catch (err) {
+        detailsEl.innerHTML = `<article class="glass card" style="padding:2rem;text-align:center"><span style="color:var(--danger)">Failed to load collective detail: ${err.message}</span></article>`;
+      }
+    }
+
+    async function sendTeamInvite(teamId) {
+      const emailInput = document.getElementById('squad-invite-email');
+      const email = emailInput.value.trim();
+
+      if (!email) {
+        showToast('Email address is required for recruitment!', 'warning');
+        return;
+      }
+
+      try {
+        await API.post(`/teams/${teamId}/invite`, { email });
+        showToast(`Recruitment invitation dispatched to ${email}!`, 'success');
+        emailInput.value = '';
+        viewTeamHubDetails(teamId);
+      } catch (err) {
+        showToast('Recruitment failed: ' + err.message, 'error');
+      }
+    }
+
+    function updateTeamRole(teamId, memberId, role) {
+      API.put(`/teams/${teamId}/members/${memberId}/role`, { role })
+        .then(() => {
+          showToast('Crew role updated successfully!', 'success');
+          viewTeamHubDetails(teamId);
+        }).catch(err => showToast(err.message, 'error'));
+    }
+
+    function removeTeamMember(teamId, memberId) {
+      const me = getUser();
+      const confirmMsg = memberId === me.id ? 'Are you sure you want to leave this collective?' : 'Expel member from crew?';
+      if (!confirm(confirmMsg)) return;
+
+      API.delete(`/teams/${teamId}/members/${memberId}`)
+        .then(() => {
+          showToast(memberId === me.id ? 'Squad left successfully.' : 'Crew member expelled.', 'info');
+          if (memberId === me.id) {
+            currentTeamId = null;
+            document.getElementById('team-hub-details-panel').innerHTML = `
+              <article class="glass card" style="text-align:center;padding:5rem;color:var(--text-secondary)">
+                <span style="font-size:3.5rem">👥</span>
+                <h3 style="margin-top:1rem">Select or Form a Team Collective</h3>
+                <p style="font-size:0.85rem;max-width:320px;margin:0.5rem auto 0">Establish custom agencies, claim hired escrow campaigns, and develop collectively.</p>
+              </article>`;
+            loadStudentTeams();
+          } else {
+            viewTeamHubDetails(teamId);
+          }
+        }).catch(err => showToast(err.message, 'error'));
+    }
+
+    function disbandTeamCollective(teamId) {
+      if (!confirm('💥 WARNING: disassembling this squad is immutable and disbands all structural systems! Confirm disbanding?')) return;
+      API.delete(`/teams/${teamId}`)
+        .then(() => {
+          showToast('Squad disbanded and disassembled successfully.', 'info');
+          currentTeamId = null;
+          document.getElementById('team-hub-details-panel').innerHTML = `
+            <article class="glass card" style="text-align:center;padding:5rem;color:var(--text-secondary)">
+              <span style="font-size:3.5rem">👥</span>
+              <h3 style="margin-top:1rem">Select or Form a Team Collective</h3>
+              <p style="font-size:0.85rem;max-width:320px;margin:0.5rem auto 0">Establish custom agencies, claim hired escrow campaigns, and develop collectively.</p>
+            </article>`;
+          loadStudentTeams();
+        }).catch(err => showToast(err.message, 'error'));
+    }
+
+    function claimWorkspaceProject(teamId) {
+      const select = document.getElementById('claim-project-select');
+      const pid = select.value;
+      if (!pid) {
+        showToast('Choose a valid hired operations project desk!', 'warning');
+        return;
+      }
+
+      API.post(`/teams/${teamId}/projects/${pid}`)
+        .then(() => {
+          showToast('💼 Workspace assignment fully completed! Team claiming live!', 'success');
+          viewTeamHubDetails(teamId);
+        }).catch(err => showToast('Claiming failed: ' + err.message, 'error'));
+    }
+
+    // =========================================================================
+    // 💬 TEAM CHAT ROOM REAL-TIME SOCKET CONTROLS
+    // =========================================================================
+    function teamInitChat(team) {
+      teamConvId = team.id;
+      teamLoadMessages(team.id);
+
+      const sock = initSocket();
+      if (sock) {
+        joinTeam(team.id);
+        
+        // Remove existing listener if any to avoid multiple registers
+        sock.off('new_team_message');
+        sock.off('team_typing');
+        sock.off('team_stop_typing');
+
+        onNewTeamMessage(msg => {
+          if (msg.team_id === teamConvId) teamAppendMessage(msg);
+        });
+
+        sock.on('team_typing', d => {
+          if (d.team_id === teamConvId && d.user_id !== getUser().id) {
+            document.getElementById('team-typing-indicator').textContent = `${d.user_name} is typing…`;
+          }
+        });
+
+        sock.on('team_stop_typing', d => {
+          if (d.team_id === teamConvId) {
+            document.getElementById('team-typing-indicator').textContent = '';
+          }
+        });
+      }
+    }
+
+    function teamLoadMessages(teamId) {
+      API.get(`/teams/${teamId}/messages`)
+        .then(msgs => {
+          const box = document.getElementById('team-chat-messages');
+          if (!msgs.length) {
+            box.innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem;text-align:center;padding-top:2rem">No broadcast logs. Broadcast to the crew! 🗨️</p>';
+            return;
+          }
+          box.innerHTML = '';
+          msgs.forEach(m => teamAppendMessage(m, false));
+          box.scrollTop = box.scrollHeight;
+        }).catch(() => {});
+    }
+
+    function teamAppendMessage(msg, scroll = true) {
+      const box = document.getElementById('team-chat-messages');
+      if (box.querySelector('p')) box.innerHTML = '';
+      const div = document.createElement('div');
+      const isSelf = msg.sender_id === getUser().id;
+      div.className = 'ws-msg ' + (isSelf ? 'sent' : 'recv');
+      const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+      div.innerHTML = `${escapeHtml(msg.message)}<div class="msg-meta">${msg.sender_name||'CrewMember'} · ${time}</div>`;
+      box.appendChild(div);
+      if (scroll) box.scrollTop = box.scrollHeight;
+    }
+
+    function teamChatKeydown(e) {
+      if (e.key === 'Enter') { teamSendMsg(); return; }
+      emitTeamTyping(teamConvId);
+      clearTimeout(teamTypingTimeout);
+      teamTypingTimeout = setTimeout(() => emitTeamStopTyping(teamConvId), 1500);
+    }
+
+    function teamSendMsg() {
+      const input = document.getElementById('team-chat-input');
+      const text = input.value.trim();
+      if (!text || !teamConvId) return;
+      sendTeamSocketMessage(teamConvId, text);
+      
+      // Optimistically append local
+      teamAppendMessage({
+        sender_id: getUser().id,
+        message: text,
+        sender_name: 'You',
+        created_at: new Date().toISOString(),
+        team_id: teamConvId
+      });
+      
+      input.value = '';
+      emitTeamStopTyping(teamConvId);
+    }
+
   </script>
 </body>
 </html>
+

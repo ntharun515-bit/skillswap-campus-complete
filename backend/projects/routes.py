@@ -132,9 +132,18 @@ def my_projects():
     else:
         apps = Application.query.filter_by(applicant_id=user_id, status="accepted").all()
         project_ids = [a.project_id for a in apps]
-        projects = Project.query.filter(
-            (Project.id.in_(project_ids)) | (Project.hired_freelancer_id == user_id)
-        ).all() if project_ids else Project.query.filter_by(hired_freelancer_id=user_id).all()
+        
+        from backend.models import TeamMember
+        team_memberships = TeamMember.query.filter_by(user_id=user_id).all()
+        team_ids = [tm.team_id for tm in team_memberships]
+        
+        query_conditions = [Project.hired_freelancer_id == user_id]
+        if project_ids:
+            query_conditions.append(Project.id.in_(project_ids))
+        if team_ids:
+            query_conditions.append(Project.team_id.in_(team_ids))
+            
+        projects = Project.query.filter(or_(*query_conditions)).order_by(Project.created_at.desc()).all()
     return jsonify([p.to_dict() for p in projects])
 
 
@@ -222,8 +231,9 @@ def update_application(app_id):
         
         create_notification(app.applicant_id, "Application Accepted", f"You were hired for {project.title}! {budget} credits are held in Escrow.", "success")
     
+    old_status = app.status
     app.status = status
-    if status == "rejected" and app.status != "rejected":
+    if status == "rejected" and old_status != "rejected":
         create_notification(app.applicant_id, "Application Update", f"Your application for {project.title} was not selected.")
         
     db.session.commit()
