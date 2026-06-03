@@ -29,6 +29,15 @@ def create_app(config_name=None):
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
     os.makedirs(os.path.join(os.path.dirname(__file__), "..", "logs"), exist_ok=True)
 
+    db_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    if db_uri.startswith("sqlite:///"):
+        # For sqlite:////absolute/path, remove the sqlite:/// prefix to get the absolute path
+        # For sqlite:///relative/path, it also works
+        db_path = db_uri.replace("sqlite:///", "")
+        db_dir = os.path.dirname(db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
+
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
