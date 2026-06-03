@@ -59,8 +59,8 @@ def profile_summary():
             )
             if resp.status_code == 200 and isinstance(resp.json(), list):
                 summary = resp.json()[0].get("summary_text", summary)
-        except Exception:
-            pass
+        except Exception as e:
+            current_app.logger.warning(f"Failed to fetch HuggingFace summary: {e}")
     profile.ai_summary = summary
     db.session.commit()
     return jsonify({"summary": summary})
@@ -150,8 +150,8 @@ def chatbot():
         user_identity = get_jwt_identity()
         if user_identity:
             user_id = int(user_identity)
-    except Exception:
-        pass
+    except Exception as e:
+        current_app.logger.warning(f"Chatbot JWT parse skipped: {e}")
 
     # DB query helpers for dynamic replies
     if "open project" in message or "available project" in message or "jobs" in message or "how many project" in message:
@@ -980,8 +980,8 @@ def generate_proposal():
                 generated_text = resp.json()[0].get("generated_text", "")
                 if generated_text and len(generated_text) > len(prompt):
                     proposal = generated_text[len(prompt):].strip()
-        except Exception:
-            pass
+        except Exception as e:
+            current_app.logger.warning(f"Failed to generate HuggingFace cover letter: {e}")
             
     return jsonify({
         "proposal": proposal,

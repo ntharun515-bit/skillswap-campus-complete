@@ -277,8 +277,10 @@
               </div>
               <div class="ws-typing" id="ws-typing-indicator"></div>
               <div class="ws-chat-input-row">
+                <input type="file" id="ws-chat-file" style="display:none" onchange="wsUploadChatFile(event, 'ws-chat-input')">
+                <button class="btn btn-ghost" style="padding:0;background:transparent;color:var(--text-secondary);font-size:1.2rem;box-shadow:none" onclick="document.getElementById('ws-chat-file').click()" title="Attach file">📎</button>
                 <input type="text" id="ws-chat-input" placeholder="Message the freelancer…" onkeydown="wsChatKeydown(event)">
-                <button onclick="wsSendMsg()">Send</button>
+                <button class="btn btn-primary btn-sm" onclick="wsSendMsg()">Send</button>
               </div>
             </div>
 
@@ -574,16 +576,18 @@
     // ═══════════════════════════════════════
     let wsConvId = null;
     let wsMeId = null;
+    let wsOtherId = null;
     let wsTypingTimeout = null;
+    let currentReviewScore = 0;
 
     function wsInitChat(project) {
       const me = JSON.parse(localStorage.getItem(CONFIG.USER_KEY) || '{}');
       wsMeId = me.id;
-      const otherId = project.hired_freelancer_id;
-      if (!otherId) return;
+      wsOtherId = project.hired_freelancer_id;
+      if (!wsOtherId) return;
       document.getElementById('ws-other-name').textContent = '— Freelancer';
 
-      API.post('/chat/conversations', { user_id: otherId, project_id: project.id })
+      API.post('/chat/conversations', { user_id: wsOtherId, project_id: project.id })
         .then(res => {
           wsConvId = res.conversation_id;
           wsLoadMessages();
@@ -629,7 +633,12 @@
       const div = document.createElement('div');
       div.className = 'ws-msg ' + (msg.sender_id === wsMeId ? 'sent' : 'recv');
       const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
-      div.innerHTML = `${escapeHtml(msg.content)}<div class="msg-meta">${msg.sender_name||''} · ${time}</div>`;
+      
+      let htmlContent = escapeHtml(msg.content);
+      // Auto-link URLs
+      htmlContent = htmlContent.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:inherit;text-decoration:underline">$1</a>');
+
+      div.innerHTML = `${htmlContent}<div class="msg-meta">${msg.sender_name||''} · ${time}</div>`;
       box.appendChild(div);
       if (scroll) box.scrollTop = box.scrollHeight;
     }
@@ -651,6 +660,31 @@
       emitStopTyping(wsConvId);
     }
 
+    async function wsUploadChatFile(e, inputId) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch(CONFIG.API_URL + '/chat/upload', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + localStorage.getItem(CONFIG.TOKEN_KEY) },
+          body: formData
+        });
+        const data = await res.json();
+        if (data.file_path) {
+          const inputEl = document.getElementById(inputId);
+          inputEl.value = (inputEl.value + ' ' + location.origin + data.file_path).trim();
+          showToast('Attachment uploaded! Ready to send.', 'success');
+        } else {
+          showToast(data.error || 'Upload failed', 'error');
+        }
+      } catch (err) {
+        showToast('Upload failed: ' + err.message, 'error');
+      }
+      e.target.value = '';
+    }
+
     function wsUpdateReviewPanel(project) {
       const statusEl = document.getElementById('ws-review-status');
       const actionsEl = document.getElementById('ws-review-actions');
@@ -665,7 +699,16 @@
             </div>`;
           actionsEl.style.display = 'flex';
         } else if (project.status === 'completed') {
-          statusEl.innerHTML = '<div style="color:var(--success);font-weight:700">✅ Completed — Payment Released</div>';
+          statusEl.innerHTML = `
+            <div style="background:rgba(16,185,129,0.1);padding:1.25rem;border-radius:var(--radius-lg);border:1px solid rgba(16,185,129,0.3)">
+              <div style="color:var(--success);font-weight:800;font-size:1.05rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem">
+                <span>✅</span> Project Completed & Paid
+              </div>
+              <div id="review-form-container" style="background:var(--bg-primary);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border)">
+                <p style="color:var(--text-secondary);font-size:0.9rem">Feedback has been provided and payment released.</p>
+              </div>
+            </div>
+          `;
           actionsEl.style.display = 'none';
         } else {
           statusEl.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem">No deliverables submitted yet. The freelancer is working on the project.</p>';
@@ -758,6 +801,8 @@
         submitBtn.textContent = 'Submit & Release Payout';
       });
     }
+
+    // Approving and Releasing Escrowed Payout (Now chained in submitMandatoryReviewAndRelease)
 
     // Revision Requests — uses the dedicated /request-revision endpoint
     function requestProjectRevision() {

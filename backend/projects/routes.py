@@ -3,7 +3,8 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy import or_
-from backend.extensions import db, socketio
+from sqlalchemy.orm import joinedload, selectinload
+from backend.extensions import db, socketio, cache
 from backend.models import (
     Project, Application, Review, Payment, SavedJob,
     User, FreelancerProfile, Category, Notification, Wallet, Transaction, EscrowPayment
@@ -613,6 +614,7 @@ def payments(project_id):
 
 
 @projects_bp.route("/categories", methods=["GET"])
+@cache.cached(timeout=3600)
 def categories():
     cats = Category.query.all()
     return jsonify([{"id": c.id, "name": c.name, "slug": c.slug, "icon": c.icon} for c in cats])

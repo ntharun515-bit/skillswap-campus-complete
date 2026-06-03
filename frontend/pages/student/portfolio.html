@@ -106,8 +106,9 @@
                   <h4 style="font-size:1.05rem;color:var(--text-primary);margin-bottom:0.25rem">${i.title}</h4>
                   <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.4">${i.description || 'No description provided.'}</p>
                 </div>
-                <div>
+                <div style="display:flex;justify-content:space-between;align-items:flex-end">
                   ${externalLink}
+                  <button class="btn btn-ghost btn-sm" onclick="deletePortfolioItem(${i.id})" style="color:var(--danger);border-color:var(--danger);margin-top:0.75rem;padding:0.2rem 0.5rem;font-size:0.7rem">🗑️ Delete</button>
                 </div>
               </article>
             `;
@@ -130,6 +131,17 @@
           loadPortfolio();
         } catch (err) {
           showToast('Failed to save portfolio item: ' + err.message, 'error');
+        }
+      };
+
+      window.deletePortfolioItem = async function(id) {
+        if (!confirm("Are you sure you want to remove this portfolio item?")) return;
+        try {
+          await API.delete(`/users/portfolio/${id}`);
+          showToast('Portfolio item removed', 'info');
+          loadPortfolio();
+        } catch (err) {
+          showToast('Failed to delete item: ' + err.message, 'error');
         }
       };
 

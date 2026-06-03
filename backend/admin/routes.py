@@ -22,6 +22,14 @@ def dashboard():
     admin_wallets = db.session.query(Wallet).join(User).join(Role).filter(Role.name == "admin").all()
     platform_fees = sum(float(w.total_earned or 0) for w in admin_wallets)
 
+    import datetime
+    today = datetime.date.today()
+    user_growth = []
+    for i in range(6, -1, -1):
+        d = today - datetime.timedelta(days=i)
+        count = User.query.filter(func.date(User.created_at) == d).count()
+        user_growth.append({"date": d.strftime("%b %d"), "count": count})
+
     stats = {
         "users": User.query.count(),
         "users_count": User.query.count(),
@@ -34,7 +42,8 @@ def dashboard():
         "revenue": float(db.session.query(func.sum(Payment.amount)).filter_by(status="completed").scalar() or 0),
         "freelancers": FreelancerProfile.query.count(),
         "payouts_count": EscrowPayment.query.filter(EscrowPayment.status.in_(["Released", "released"])).count(),
-        "platform_fees": platform_fees
+        "platform_fees": platform_fees,
+        "user_growth": user_growth
     }
     return jsonify(stats)
 

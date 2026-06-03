@@ -15,7 +15,7 @@ def get_or_create_wallet(user_id, role_name):
     """Helper to fetch or establish a virtual wallet with seed credits."""
     wallet = Wallet.query.filter_by(user_id=user_id).first()
     if not wallet:
-        # Give initial balance: $1000 for clients, $0 for students/freelancers
+        # Give initial balance: ₹1000 for clients, ₹0 for students/freelancers
         initial_balance = 1000.00 if role_name == "client" else 0.00
         wallet = Wallet(
             user_id=user_id,

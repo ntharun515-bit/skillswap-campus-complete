@@ -2,6 +2,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy import or_
+from sqlalchemy.orm import joinedload, selectinload
 from backend.extensions import db
 from backend.models import User, FreelancerProfile, Skill, UserSkill, PortfolioItem, SavedFreelancer, Wallet, Transaction
 from backend.utils import save_upload, create_notification
@@ -36,7 +37,10 @@ def list_freelancers():
         query = query.filter(or_(User.full_name.ilike(f"%{q}%"), FreelancerProfile.headline.ilike(f"%{q}%")))
     if skill:
         query = query.join(UserSkill).join(Skill).filter(Skill.name.ilike(f"%{skill}%"))
-    profiles = query.order_by(FreelancerProfile.is_featured.desc(), FreelancerProfile.rating_avg.desc()).limit(50).all()
+    profiles = query.options(
+        joinedload(FreelancerProfile.user),
+        selectinload(FreelancerProfile.skills).joinedload(UserSkill.skill)
+    ).order_by(FreelancerProfile.is_featured.desc(), FreelancerProfile.rating_avg.desc()).limit(50).all()
     return jsonify([p.to_dict() for p in profiles])
 
 
@@ -45,7 +49,14 @@ def get_freelancer(user_id):
     profile = FreelancerProfile.query.filter_by(user_id=user_id).first()
     if not profile:
         return jsonify({"error": "Freelancer not found"}), 404
-    return jsonify(profile.to_dict())
+        
+    data = profile.to_dict()
+    # Fetch reviews received
+    from backend.models import Review
+    reviews = Review.query.filter_by(reviewee_id=user_id).order_by(Review.created_at.desc()).all()
+    data["reviews"] = [r.to_dict() for r in reviews]
+    
+    return jsonify(data)
 
 
 @users_bp.route("/profile", methods=["GET", "PUT"])
@@ -170,6 +181,24 @@ def portfolio():
     db.session.add(item)
     db.session.commit()
     return jsonify(item.to_dict()), 201
+
+
+@users_bp.route("/portfolio/<int:item_id>", methods=["DELETE"])
+@jwt_required()
+@role_required("student")
+def delete_portfolio_item(item_id):
+    user = User.query.get(int(get_jwt_identity()))
+    profile = user.freelancer_profile
+    if not profile:
+        return jsonify({"error": "Profile not found"}), 404
+        
+    item = PortfolioItem.query.get_or_404(item_id)
+    if item.profile_id != profile.id:
+        return jsonify({"error": "Unauthorized"}), 403
+        
+    db.session.delete(item)
+    db.session.commit()
+    return jsonify({"message": "Portfolio item deleted successfully"})
 
 
 @users_bp.route("/saved-freelancers", methods=["GET", "POST", "DELETE"])
@@ -311,7 +340,7 @@ def get_leaderboard():
         joinedload(FreelancerProfile.user)
     ).join(User).filter(
         User.is_active == True, User.is_banned == False
-    ).order_by(FreelancerProfile.xp.desc(), FreelancerProfile.rating_avg.desc()).limit(10).all()
+    ).options(joinedload(FreelancerProfile.user)).order_by(FreelancerProfile.xp.desc(), FreelancerProfile.rating_avg.desc()).limit(10).all()
     
     user_ids = [p.user_id for p in profiles]
     ach_map = {}

@@ -375,6 +375,8 @@
                 </div>
                 <div class="ws-typing" id="ws-typing-indicator"></div>
                 <div class="ws-chat-input-row">
+                  <input type="file" id="ws-chat-file" style="display:none" onchange="wsUploadChatFile(event, 'ws-chat-input')">
+                  <button class="btn btn-ghost" style="padding:0;background:transparent;color:var(--text-secondary);font-size:1.2rem;box-shadow:none" onclick="document.getElementById('ws-chat-file').click()" title="Attach file">📎</button>
                   <input type="text" id="ws-chat-input" placeholder="Type a message…" onkeydown="wsChatKeydown(event)">
                   <button class="btn btn-primary btn-sm" onclick="wsSendMsg()">Send</button>
                 </div>
@@ -899,7 +901,12 @@
       const div = document.createElement('div');
       div.className = 'ws-msg ' + (msg.sender_id === wsMeId ? 'sent' : 'recv');
       const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
-      div.innerHTML = `${escapeHtml(msg.content)}<div class="msg-meta">${msg.sender_name||''} · ${time}</div>`;
+      
+      let htmlContent = escapeHtml(msg.content);
+      // Auto-link URLs
+      htmlContent = htmlContent.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:inherit;text-decoration:underline">$1</a>');
+
+      div.innerHTML = `${htmlContent}<div class="msg-meta">${msg.sender_name||''} · ${time}</div>`;
       box.appendChild(div);
       if (scroll) box.scrollTop = box.scrollHeight;
     }
@@ -919,6 +926,31 @@
       wsAppendMessage({ sender_id: wsMeId, content: text, sender_name: 'You', created_at: new Date().toISOString() });
       input.value = '';
       emitStopTyping(wsConvId);
+    }
+
+    async function wsUploadChatFile(e, inputId) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch(CONFIG.API_URL + '/chat/upload', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + localStorage.getItem(CONFIG.TOKEN_KEY) },
+          body: formData
+        });
+        const data = await res.json();
+        if (data.file_path) {
+          const inputEl = document.getElementById(inputId);
+          inputEl.value = (inputEl.value + ' ' + location.origin + data.file_path).trim();
+          showToast('Attachment uploaded! Ready to send.', 'success');
+        } else {
+          showToast(data.error || 'Upload failed', 'error');
+        }
+      } catch (err) {
+        showToast('Upload failed: ' + err.message, 'error');
+      }
+      e.target.value = '';
     }
 
     function wsUpdateSubmitPanel(project) {
@@ -1186,7 +1218,9 @@
             <div class="ws-chat-messages" id="team-chat-messages" style="height: 240px">
               <p style="color:var(--text-secondary);font-size:0.85rem;text-align:center;padding-top:2rem">Establishing collective frequencies...</p>
             </div>
-            <div class="ws-chat-input-row">
+            <div class="ws-chat-input-row" style="padding:0.75rem 1rem">
+              <input type="file" id="team-chat-file" style="display:none" onchange="wsUploadChatFile(event, 'team-chat-input')">
+              <button class="btn btn-ghost" style="padding:0;background:transparent;color:var(--text-secondary);font-size:1.2rem;box-shadow:none" onclick="document.getElementById('team-chat-file').click()" title="Attach file">📎</button>
               <input type="text" id="team-chat-input" placeholder="Broadcasting message to crew..." onkeydown="teamChatKeydown(event)">
               <button class="btn btn-primary btn-sm" onclick="teamSendMsg()">Broadcast</button>
             </div>
