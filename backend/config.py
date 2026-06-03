@@ -17,6 +17,9 @@ class Config:
 
     use_sqlite = os.getenv("USE_SQLITE", "false").lower() == "true"
     _db_url = os.getenv("DATABASE_URL", "")
+    if _db_url.startswith("postgres://"):
+        _db_url = _db_url.replace("postgres://", "postgresql://", 1)
+        
     if use_sqlite or not _db_url:
         _root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         _db_url = "sqlite:///" + os.path.join(_root, "database", "skillswap.db").replace("\\", "/")
