@@ -92,7 +92,7 @@
               <h4 style="font-size:0.85rem;margin-bottom:0.5rem">⚖️ Payout Approval Procedures</h4>
               <div style="font-size:0.75rem;color:var(--text-secondary);line-height:1.5">
                 <p style="margin-bottom:0.5rem">✔️ Ensure that the recipient developer has completed deliverables prior to release approval.</p>
-                <p style="margin-bottom:0.5rem">✔️ Rejecting a withdrawal immediately returns blocked pending payout credits to the student's available available balance.</p>
+                <p style="margin-bottom:0.5rem">✔️ Rejecting a withdrawal immediately returns blocked pending payout Rupees to the student's available balance.</p>
                 <p>✔️ Platform ledger records are legally auditable and fully immutable.</p>
               </div>
             </article>
@@ -117,7 +117,7 @@
       window.rejectPayoutRequest = function(reqId) {
         const reason = 'Administrative compliance verification.';
         API.post(`/admin/withdrawals/${reqId}/reject`, { reason: reason }).then(() => {
-          showToast('Withdrawal declined. Credits reverted to student balance.', 'info');
+          showToast('Withdrawal declined. Rupees reverted to student balance.', 'info');
           loadAdminRevenueDesk();
         }).catch(err => {
           showToast('Rejection failed: ' + err.message, 'error');
@@ -166,11 +166,11 @@
           document.getElementById('admin-stats-row').innerHTML = `
             <article class="glass stat-card" style="border-left:4px solid #f59e0b">
               <span class="label">🔒 Locked Platform Escrow</span>
-              <span class="value" style="color:#f59e0b">$${data.escrow_statistics.total_escrowed.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+              <span class="value" style="color:#f59e0b">₹${data.escrow_statistics.total_escrowed.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
             </article>
             <article class="glass stat-card" style="border-left:4px solid var(--accent)">
               <span class="label">💸 Cleared Disbursements</span>
-              <span class="value" style="color:var(--accent)">$${data.escrow_statistics.total_released.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+              <span class="value" style="color:var(--accent)">₹${data.escrow_statistics.total_released.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
             </article>
             <article class="glass stat-card" style="border-left:4px solid #ef4444">
               <span class="label">⏳ Pending Payout Queue</span>
@@ -194,7 +194,7 @@
                 <div>
                   <h4 style="font-size:0.88rem;font-weight:700">${w.user_name}</h4>
                   <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.15rem">Method: <strong>${w.method}</strong> · Filed: ${new Date(w.requested_at).toLocaleDateString()}</div>
-                  <div style="font-size:0.9rem;color:var(--accent);font-weight:700;margin-top:0.25rem">$${w.amount.toLocaleString()} Cr</div>
+                  <div style="font-size:0.9rem;color:var(--accent);font-weight:700;margin-top:0.25rem">₹${w.amount.toLocaleString()}</div>
                 </div>
                 <div style="display:flex;gap:0.4rem">
                   <button onclick="approvePayoutRequest(${w.id})" class="btn btn-primary btn-sm">✔️ Approve</button>
@@ -229,7 +229,7 @@
                   <td style="font-family:monospace;font-size:0.8rem">${t.reference_code}</td>
                   <td style="font-size:0.8rem;color:var(--text-secondary)">${t.sender_name}</td>
                   <td style="font-size:0.8rem;color:var(--text-secondary)">${t.receiver_name}</td>
-                  <td style="font-weight:900;color:${amountColor}">${prefix}$${t.amount.toFixed(2)}</td>
+                  <td style="font-weight:900;color:${amountColor}">${prefix}₹${t.amount.toFixed(2)}</td>
                   <td>${typeBadge}</td>
                   <td style="font-size:0.8rem;text-transform:capitalize">${t.status}</td>
                 </tr>

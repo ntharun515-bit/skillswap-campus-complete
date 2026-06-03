@@ -110,9 +110,9 @@
 
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem; align-items:end">
               <div class="form-group" style="margin-bottom:0">
-                <label style="font-weight:600;font-size:.82rem">Budget (Credits)</label>
+                <label style="font-weight:600;font-size:.82rem">Budget (₹)</label>
                 <div style="display:flex; gap:.5rem">
-                  <input type="number" id="b" min="5" placeholder="100" required class="form-control">
+                  <input type="number" id="b" min="5" max="10000" placeholder="100" required class="form-control">
                   <button type="button" id="ai-estimate-btn" class="btn btn-ghost" style="white-space:nowrap; display:flex; align-items:center; gap:.25rem; font-size:.82rem; padding:.5rem .75rem">
                     🪄 AI Estimate
                   </button>
@@ -138,12 +138,12 @@
                 <li>Be specific about deliverables</li>
                 <li>List exact tech skills needed</li>
                 <li>Set realistic deadlines</li>
-                <li>Budget fairly — quality costs credits</li>
+                <li>Budget fairly — quality costs Rupees</li>
               </ul>
             </article>
             <article class="glass card" style="padding:1.25rem">
               <h4 style="font-size:.88rem;margin-bottom:.5rem">🛡️ How Escrow Works</h4>
-              <p style="font-size:.78rem;color:var(--text-secondary);line-height:1.5">When you hire a freelancer, your budget is locked in escrow. Credits are only released after you approve the submitted work.</p>
+              <p style="font-size:.78rem;color:var(--text-secondary);line-height:1.5">When you hire a freelancer, your budget is locked in escrow. Rupees are only released after you approve the submitted work.</p>
             </article>
           </div>
         </div>
@@ -175,7 +175,7 @@
             if (res.recommended_skills && res.recommended_skills.length > 0 && !skills) {
               document.getElementById('skills').value = res.recommended_skills.join(', ');
             }
-            showToast(`AI Suggested: ${Math.round(res.suggested_budget)} Cr | Duration: ${res.suggested_duration}`, 'success');
+            showToast(`AI Suggested: ₹${Math.round(res.suggested_budget)} | Duration: ${res.suggested_duration}`, 'success');
           }
         } catch (err) {
           showToast('AI suggestion failed: ' + err.message, 'error');
@@ -188,7 +188,7 @@
         try {
           const user = await API.get('/auth/me');
           if (budget > user.wallet_balance) {
-            showToast(`Insufficient funds! You have ${user.wallet_balance.toFixed(0)} Cr.`, 'error');
+            showToast(`Insufficient funds! You have ₹${user.wallet_balance.toFixed(2)}.`, 'error');
             return;
           }
           await API.post('/projects', {

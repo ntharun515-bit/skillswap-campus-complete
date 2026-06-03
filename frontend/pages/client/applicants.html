@@ -8,6 +8,95 @@
   <link rel="stylesheet" href="/frontend/css/main.css">
   <link rel="stylesheet" href="/frontend/css/dashboard.css">
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    .applicant-card {
+      background: var(--bg-glass);
+      backdrop-filter: blur(var(--blur));
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+    .applicant-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 18px rgba(45,212,191,0.12);
+    }
+    .applicant-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+    .applicant-avatar {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: var(--gradient-hero);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      font-weight: 900;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .applicant-meta { flex: 1; }
+    .applicant-name {
+      font-size: 1rem;
+      font-weight: 800;
+      margin: 0 0 0.1rem 0;
+      font-family: var(--font-heading);
+    }
+    .applicant-headline {
+      font-size: 0.8rem;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .trust-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .trust-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+    }
+    .trust-chip.rating { color: #f59e0b; border-color: rgba(245,158,11,0.3); }
+    .trust-chip.level  { color: var(--accent); border-color: rgba(45,212,191,0.3); }
+    .trust-chip.no-reviews { color: var(--text-secondary); }
+    .cover-letter-text {
+      font-size: 0.83rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+      border-left: 2px solid var(--border);
+      padding-left: 0.75rem;
+      margin: 0;
+    }
+    .bid-amount {
+      font-size: 1.1rem;
+      font-weight: 900;
+      color: var(--success);
+    }
+    .action-row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .badge-hired   { background:rgba(16,185,129,.12);  color:var(--success); border:1px solid rgba(16,185,129,.3); }
+    .badge-declined{ background:rgba(239,68,68,.12);   color:var(--danger);  border:1px solid rgba(239,68,68,.3); }
+  </style>
 </head>
 <body>
   <div id="app"></div>
@@ -21,66 +110,113 @@
   <script src="/frontend/js/dashboard-layout.js"></script>
   <script>
     initDashboard('client', 'applicants', 'Applicants', function(el) {
-      el.innerHTML = `<div id="al" class="grid grid-2" style="gap:1rem"><div class="skeleton" style="height:130px;border-radius:var(--radius-lg)"></div></div>`;
+      el.innerHTML = `
+        <div style="margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem">
+          <div>
+            <h2 style="font-family:var(--font-heading);margin:0">📬 Project Applicants</h2>
+            <p style="font-size:0.83rem;color:var(--text-secondary);margin:0.2rem 0 0">Review each applicant's capabilities, ratings, and portfolio before hiring.</p>
+          </div>
+          <a href="manage-projects.html" class="btn btn-ghost btn-sm">← All Projects</a>
+        </div>
+        <div id="al" class="grid grid-2" style="gap:1.25rem">
+          <div class="skeleton" style="height:180px;border-radius:var(--radius-lg)"></div>
+          <div class="skeleton" style="height:180px;border-radius:var(--radius-lg)"></div>
+        </div>`;
 
       const al = document.getElementById('al');
       const pid = new URLSearchParams(location.search).get('project');
 
       if (!pid) {
         al.innerHTML = `
-          <div class="glass card" style="grid-column:1/-1;text-align:center;padding:2.5rem">
-            <p style="color:var(--text-secondary);font-size:.88rem">Select a project first.</p>
-            <a href="manage-projects.html" class="btn btn-primary btn-sm" style="margin-top:1rem">Manage Projects</a>
+          <div class="glass card" style="grid-column:1/-1;text-align:center;padding:3rem">
+            <p style="color:var(--text-secondary);font-size:.88rem;margin-bottom:1rem">Select a project first to view its applicants.</p>
+            <a href="manage-projects.html" class="btn btn-primary btn-sm">Manage Projects</a>
           </div>`;
         return;
+      }
+
+      function renderStars(avg, count) {
+        if (!count) return `<span class="trust-chip no-reviews">☆ No reviews yet</span>`;
+        const stars = '⭐'.repeat(Math.round(avg));
+        return `<span class="trust-chip rating">${stars} ${avg.toFixed(1)} (${count} review${count !== 1 ? 's' : ''})</span>`;
+      }
+
+      function levelColor(level) {
+        const l = (level || '').toLowerCase();
+        if (l.includes('expert') || l.includes('master')) return '#a855f7';
+        if (l.includes('pro'))    return '#3b82f6';
+        if (l.includes('senior')) return '#f59e0b';
+        return 'var(--accent)';
       }
 
       async function load() {
         try {
           const apps = await API.get(`/projects/${pid}/applications`);
           if (!apps.length) {
-            al.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:var(--text-secondary);padding:2rem">No applications yet.</p>';
+            al.innerHTML = `<p style="grid-column:1/-1;text-align:center;color:var(--text-secondary);padding:3rem">No applications yet. Share your project link to attract students!</p>`;
             return;
           }
 
           al.innerHTML = apps.map(a => {
-            const bid = a.proposed_rate ? formatMoney(a.proposed_rate) : 'Standard';
-            let status = '';
+            const bid = a.proposed_rate ? formatMoney(a.proposed_rate) : 'Negotiable';
+            const initials = (a.applicant_name || 'S').split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+            const headline = a.applicant_headline || 'Campus Freelancer';
+            const level = a.applicant_level || 'Rookie';
+            const slug = a.applicant_slug;
+            const portfolioLink = slug
+              ? `<a href="/profile/${slug}" target="_blank" class="btn btn-ghost btn-sm" style="font-size:.72rem">🔍 View Portfolio</a>`
+              : '';
+
+            let actionHtml = '';
             if (a.status === 'accepted') {
-              status = `
-                <div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;margin-top:.75rem">
-                  <span class="badge" style="background:rgba(16,185,129,.12);color:var(--success)">Hired</span>
-                  <a href="workspace.html?project=${pid}" class="btn btn-primary btn-sm" style="font-size:.72rem">Open Workspace</a>
-                </div>`;
+              actionHtml = `
+                <span class="badge trust-chip badge-hired" style="padding:.3rem .75rem">✅ Hired</span>
+                <a href="workspace.html?project=${pid}" class="btn btn-primary btn-sm" style="font-size:.75rem">Open Workspace</a>`;
             } else if (a.status === 'rejected') {
-              status = '<span class="badge" style="background:rgba(239,68,68,.12);color:var(--danger);margin-top:.75rem;display:inline-block">Declined</span>';
+              actionHtml = `<span class="badge trust-chip badge-declined" style="padding:.3rem .75rem">✗ Declined</span>`;
             } else {
-              status = `
-                <div style="display:flex;gap:.4rem;margin-top:.75rem">
-                  <button class="btn btn-primary btn-sm accept-btn" data-id="${a.id}" style="font-size:.75rem">Hire</button>
-                  <button class="btn btn-ghost btn-sm reject-btn" data-id="${a.id}" style="font-size:.75rem">Decline</button>
-                </div>`;
+              actionHtml = `
+                <button class="btn btn-primary btn-sm accept-btn" data-id="${a.id}" style="font-size:.75rem">✅ Hire</button>
+                <button class="btn btn-ghost btn-sm reject-btn" data-id="${a.id}" style="font-size:.75rem;color:var(--danger)">✗ Decline</button>`;
             }
 
             return `
-              <article class="glass card" style="padding:1.25rem;display:flex;flex-direction:column">
-                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:.5rem">
-                  <h3 style="font-size:.95rem;margin:0">${a.applicant_name}</h3>
-                  <span style="font-weight:700;color:var(--success);font-size:.9rem">${bid}</span>
+              <div class="applicant-card" id="card-${a.id}">
+                <div class="applicant-card-header">
+                  <div class="applicant-avatar">${initials}</div>
+                  <div class="applicant-meta">
+                    <h3 class="applicant-name">${a.applicant_name}</h3>
+                    <div class="applicant-headline">${headline}</div>
+                  </div>
+                  <div class="bid-amount">${bid}</div>
                 </div>
-                <p style="font-size:.82rem;color:var(--text-secondary);line-height:1.45;flex:1">${a.cover_letter}</p>
-                ${status}
-              </article>`;
+
+                <div class="trust-row">
+                  ${renderStars(a.applicant_rating_avg, a.applicant_rating_count)}
+                  <span class="trust-chip level" style="color:${levelColor(level)}">⚡ ${level}</span>
+                  ${portfolioLink}
+                </div>
+
+                <p class="cover-letter-text">${a.cover_letter}</p>
+
+                <div class="action-row">${actionHtml}</div>
+              </div>`;
           }).join('');
 
           al.querySelectorAll('.accept-btn').forEach(btn => {
             btn.onclick = async () => {
-              if (confirm('Hire this freelancer? This will lock your project budget in escrow.')) {
+              if (confirm('Hire this student? Their project budget will be locked in Virtual Escrow.')) {
                 try {
+                  btn.disabled = true;
+                  btn.textContent = '⏳ Hiring...';
                   await API.put(`/projects/applications/${btn.dataset.id}`, { status: 'accepted' });
-                  showToast('Freelancer hired!', 'success');
+                  showToast('🎉 Freelancer hired and escrow locked!', 'success');
                   load();
-                } catch (err) { showToast('Error: ' + err.message, 'error'); }
+                } catch (err) {
+                  showToast('Error: ' + err.message, 'error');
+                  btn.disabled = false;
+                  btn.textContent = '✅ Hire';
+                }
               }
             };
           });
@@ -88,17 +224,21 @@
           al.querySelectorAll('.reject-btn').forEach(btn => {
             btn.onclick = async () => {
               try {
+                btn.disabled = true;
                 await API.put(`/projects/applications/${btn.dataset.id}`, { status: 'rejected' });
-                showToast('Proposal declined', 'info');
+                showToast('Proposal declined.', 'info');
                 load();
-              } catch (err) { showToast('Error: ' + err.message, 'error'); }
+              } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+                btn.disabled = false;
+              }
             };
           });
 
-        } catch (err) { showToast('Error: ' + err.message, 'error'); }
+        } catch (err) { showToast('Failed to load applicants: ' + err.message, 'error'); }
       }
       load();
     });
   </script>
 </body>
-</html>
+</html>

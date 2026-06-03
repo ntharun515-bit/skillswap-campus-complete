@@ -16,7 +16,7 @@ function initSocket() {
 
   socket = io(CONFIG.SOCKET_URL, {
     query: { token },
-    transports: ["websocket", "polling"],
+    transports: ["websocket"],
   });
 
   socket.on("connect", () => {

@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/frontend/css/variables.css">
   <link rel="stylesheet" href="/frontend/css/main.css">
   <link rel="stylesheet" href="/frontend/css/dashboard.css">
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
   <style>
     .sdash{display:grid;grid-template-columns:1fr 310px;gap:1.5rem;margin-top:1.25rem}
     @media(max-width:960px){.sdash{grid-template-columns:1fr}}
@@ -137,7 +137,7 @@
 
             <!-- Interactive Earnings Analytics Chart -->
             <article class="glass card chart-card">
-              <h3 style="font-size:.95rem;margin-bottom:.75rem">Earnings Flow (Credits)</h3>
+              <h3 style="font-size:.95rem;margin-bottom:.75rem">Earnings Flow (Rupees)</h3>
               <svg class="chart-svg" id="earnings-chart-svg" viewBox="0 0 380 165">
                 <defs>
                   <linearGradient id="chart-grad" x1="0" y1="0" x2="0" y2="1">
@@ -293,7 +293,7 @@
           <g class="chart-point-group" style="cursor:pointer">
             <circle cx="${p.x}" cy="${p.y}" r="5" fill="var(--accent)" stroke="var(--bg-secondary)" stroke-width="2" />
             <circle cx="${p.x}" cy="${p.y}" r="12" fill="var(--accent)" opacity="0" class="hover-trigger" />
-            <title>${p.label}: ${p.val.toFixed(0)} Cr Earned</title>
+            <title>${p.label}: ${formatMoney(p.val)} Earned</title>
           </g>
         `).join('');
 
@@ -325,7 +325,7 @@
         API.get('/auth/me'),
         API.get('/ai/project-matches').catch(() => []),
         API.get('/users/leaderboard').catch(() => []),
-        API.get('/payments/history').catch(() => []),
+        API.get('/payments/history').catch(() => ({ transactions: [] })),
         API.get('/projects/saved').catch(() => []),
         API.get('/projects/applications/my').catch(() => []),
         API.get('/projects/my').catch(() => [])
@@ -340,7 +340,7 @@
         document.getElementById('st').innerHTML = `
           <article class="glass stat-card">
             <span class="label">💰 Wallet</span>
-            <span class="value" style="color:var(--success)">${user.wallet_balance.toFixed(0)} Cr</span>
+            <span class="value" style="color:var(--success)">${formatMoney(user.wallet_balance)}</span>
           </article>
           <article class="glass stat-card">
             <span class="label">⭐ Rating</span>
@@ -423,7 +423,7 @@
             <a href="projects.html" class="bookmark-card">
               <span class="bookmark-title">${p.title}</span>
               <div class="bookmark-meta">
-                <span style="color:var(--success); font-weight:700">${p.budget} Cr</span>
+                <span style="color:var(--success); font-weight:700">${formatMoney(p.budget)}</span>
                 <span>${p.duration || '2-4 weeks'}</span>
               </div>
             </a>
@@ -539,7 +539,7 @@
           }).join('');
         }
 
-        drawEarningsChart(history);
+        drawEarningsChart(history?.transactions || []);
 
       }).catch(err => showToast('Error: ' + err.message, 'error'));
     });

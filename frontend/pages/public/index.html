@@ -64,7 +64,7 @@
       <p class="landing-subtitle">
         SkillSwap is the all-in-one freelance ecosystem built exclusively for university students.
         Post projects, hire verified peers, manage work through collaborative workspaces,
-        and transact securely with our smart escrow credit system — all within your campus network.
+        and transact securely with our smart escrow Rupee system — all within your campus network.
       </p>
       <div class="hero-actions">
         <a href="/register" class="btn btn-primary btn-lg">Create Free Account</a>
@@ -83,7 +83,7 @@
         </div>
         <div class="stat-box">
           <div class="stat-number" id="s-credits">—</div>
-          <div class="stat-label">Credits Exchanged</div>
+          <div class="stat-label">Rupees Exchanged</div>
         </div>
         <div class="stat-box">
           <div class="stat-number">< 1s</div>
@@ -102,7 +102,7 @@
         <article class="glass card how-card">
           <div class="step-num">1</div>
           <h3>Post a Project</h3>
-          <p>Clients describe their needs, set a budget in campus credits, and define the required skills and deadline.</p>
+          <p>Clients describe their needs, set a budget in Rupees, and define the required skills and deadline.</p>
         </article>
         <article class="glass card how-card">
           <div class="step-num">2</div>
@@ -117,7 +117,7 @@
         <article class="glass card how-card">
           <div class="step-num">4</div>
           <h3>Review & Release Payment</h3>
-          <p>Once work is submitted, review deliverables and approve. Credits are released from escrow to the freelancer instantly.</p>
+          <p>Once work is submitted, review deliverables and approve. Rupees are released from escrow to the freelancer instantly.</p>
         </article>
       </div>
     </section>
@@ -132,7 +132,7 @@
         <article class="glass card" style="padding:2rem">
           <div class="feature-icon">🛡️</div>
           <h3 style="font-size:1.15rem;margin-bottom:0.5rem">Smart Escrow Protection</h3>
-          <p>Funds are locked the moment you hire. Neither party can lose — credits are held securely until work is approved or disputed through admin mediation.</p>
+          <p>Funds are locked the moment you hire. Neither party can lose — Rupees are held securely until work is approved or disputed through admin mediation.</p>
         </article>
         <article class="glass card" style="padding:2rem">
           <div class="feature-icon">🤖</div>
@@ -213,8 +213,8 @@
     <!-- ══════════ CTA BANNER ══════════ -->
     <section class="section container" style="padding: 0 0 5rem;">
       <div class="cta-banner">
-        <h2>Ready to Turn Your Skills into Campus Currency?</h2>
-        <p>Join thousands of students already building real portfolios, earning credits, and gaining professional experience — all within their university network.</p>
+        <h2>Ready to Turn Your Skills into Real Earnings?</h2>
+        <p>Join thousands of students already building real portfolios, earning Rupees, and gaining professional experience — all within their university network.</p>
         <a href="/register" class="btn btn-primary btn-lg">Get Started — It's Free</a>
       </div>
     </section>
@@ -243,7 +243,7 @@
         document.getElementById('s-projects').textContent = projects.length || '0';
         document.getElementById('s-freelancers').textContent = freelancers.length || '0';
         const totalBudget = projects.reduce((s, p) => s + (p.budget || 0), 0);
-        document.getElementById('s-credits').textContent = totalBudget > 1000 ? (totalBudget / 1000).toFixed(1) + 'k' : totalBudget.toFixed(0);
+        document.getElementById('s-credits').textContent = totalBudget > 1000 ? '₹' + (totalBudget / 1000).toFixed(1) + 'k' : '₹' + totalBudget.toFixed(0);
       } catch(e) {}
     })();
   </script>

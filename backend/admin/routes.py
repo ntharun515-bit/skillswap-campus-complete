@@ -250,6 +250,13 @@ def resolve_dispute(dispute_id):
             escrow.released_at = datetime.utcnow()
             project.status = "Completed"
 
+            # Sync legacy Payment model if exists
+            legacy_payment = Payment.query.filter_by(project_id=project.id, status="escrowed").first()
+            if not legacy_payment:
+                legacy_payment = Payment.query.filter_by(project_id=project.id, status="disputed").first()
+            if legacy_payment:
+                legacy_payment.status = "completed"
+
             # Log ledger payout transaction
             ref = f"PAY-{uuid.uuid4().hex[:8].upper()}"
             tx = Transaction(
@@ -259,7 +266,7 @@ def resolve_dispute(dispute_id):
                 type="escrow_release",
                 status="completed",
                 reference_code=ref,
-                description=f"Admin resolved dispute: Released escrow payment of ${net_amount:.2f} (after 5% platform fee) for campaign '{project.title}' completion."
+                description=f"Admin resolved dispute: Released escrow payment of ₹{net_amount:.2f} (after 5% platform fee) for campaign '{project.title}' completion."
             )
             db.session.add(tx)
 
@@ -273,7 +280,7 @@ def resolve_dispute(dispute_id):
                     type="commission",
                     status="completed",
                     reference_code=ref_com,
-                    description=f"Admin resolved dispute: Platform fee of ${commission:.2f} (5%) for campaign '{project.title}' completion."
+                    description=f"Admin resolved dispute: Platform fee of ₹{commission:.2f} (5%) for campaign '{project.title}' completion."
                 )
                 db.session.add(com_tx)
 
@@ -282,21 +289,21 @@ def resolve_dispute(dispute_id):
                 project_id=project.id,
                 status="completed",
                 action_by_id=admin_id,
-                details=f"Admin resolved dispute in favor of freelancer. ${net_amount:.2f} released."
+                details=f"Admin resolved dispute in favor of freelancer. ₹{net_amount:.2f} released."
             )
             db.session.add(timeline)
 
             # Notifications / Alerts
-            trigger_payment_alert(escrow.freelancer_id, "🎉 Payment Released", f"The dispute on '{project.title}' was resolved and ${net_amount:.2f} Cr was credited to your wallet!")
+            trigger_payment_alert(escrow.freelancer_id, "🎉 Payment Released", f"The dispute on '{project.title}' was resolved and ₹{net_amount:.2f} was credited to your wallet!")
             trigger_payment_alert(escrow.client_id, "✅ Dispute Resolved", f"The dispute on '{project.title}' was resolved. Funds were released to the freelancer.")
             if admin_user:
-                trigger_payment_alert(admin_user.id, "📈 Fee Earned", f"Platform fee of {commission} received from dispute resolution!")
+                trigger_payment_alert(admin_user.id, "📈 Fee Earned", f"Platform fee of ₹{commission:,.2f} received from dispute resolution!")
 
             # Add system activity log
             activity = ActivityLog(
                 user_id=admin_id,
                 action="dispute_resolved_release",
-                details=f"Admin resolved dispute #{dispute.id} releasing escrow of ${amount:.2f} (net ${net_amount:.2f}) to freelancer #{escrow.freelancer_id}."
+                details=f"Admin resolved dispute #{dispute.id} releasing escrow of ₹{amount:.2f} (net ₹{net_amount:.2f}) to freelancer #{escrow.freelancer_id}."
             )
             db.session.add(activity)
 
@@ -313,6 +320,13 @@ def resolve_dispute(dispute_id):
             escrow.status = "Refunded"
             project.status = "cancelled"
 
+            # Sync legacy Payment model if exists
+            legacy_payment = Payment.query.filter_by(project_id=project.id, status="escrowed").first()
+            if not legacy_payment:
+                legacy_payment = Payment.query.filter_by(project_id=project.id, status="disputed").first()
+            if legacy_payment:
+                legacy_payment.status = "refunded"
+
             # Log ledger
             ref = f"REF-{uuid.uuid4().hex[:8].upper()}"
             tx = Transaction(
@@ -322,7 +336,7 @@ def resolve_dispute(dispute_id):
                 type="refund",
                 status="completed",
                 reference_code=ref,
-                description=f"Admin resolved dispute: Refunded locked escrow contract of ${amount:.2f} back to client."
+                description=f"Admin resolved dispute: Refunded locked escrow contract of ₹{amount:.2f} back to client."
             )
             db.session.add(tx)
 
@@ -331,19 +345,19 @@ def resolve_dispute(dispute_id):
                 project_id=project.id,
                 status="cancelled",
                 action_by_id=admin_id,
-                details=f"Admin resolved dispute in favor of client. ${amount:.2f} refunded."
+                details=f"Admin resolved dispute in favor of client. ₹{amount:.2f} refunded."
             )
             db.session.add(timeline)
 
             # Notifications / Alerts
-            trigger_payment_alert(escrow.client_id, "↩️ Escrow Refunded", f"Dispute resolved. Successfully refunded ${amount:,.2f} virtual credits back to your wallet.")
+            trigger_payment_alert(escrow.client_id, "↩️ Escrow Refunded", f"Dispute resolved. Successfully refunded ₹{amount:,.2f} back to your wallet.")
             trigger_payment_alert(escrow.freelancer_id, "⚠️ Project Cancelled", f"The dispute on '{project.title}' was resolved. Escrowed funds have been returned to the client.")
 
             # Add system activity log
             activity = ActivityLog(
                 user_id=admin_id,
                 action="dispute_resolved_refund",
-                details=f"Admin resolved dispute #{dispute.id} refunding escrow of ${amount:.2f} to client #{escrow.client_id}."
+                details=f"Admin resolved dispute #{dispute.id} refunding escrow of ₹{amount:.2f} to client #{escrow.client_id}."
             )
             db.session.add(activity)
 

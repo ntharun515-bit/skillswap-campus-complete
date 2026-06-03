@@ -113,14 +113,14 @@ function renderSidebar(role, active) {
   const items = menus[role] || [];
   const base = `/frontend/pages/${role}/`;
 
-  // Query live balance to keep sidebar assets absolutely in sync
+  // Defer wallet refresh until after page content has rendered (800ms)
   setTimeout(() => {
     API.get('/auth/me').then(u => {
       const el = document.getElementById('sidebar-wallet-value');
-      if (el) el.textContent = u.wallet_balance.toFixed(2) + ' Cr';
+      if (el) el.textContent = formatMoney(u.wallet_balance);
       localStorage.setItem(CONFIG.USER_KEY, JSON.stringify(u));
     }).catch(() => {});
-  }, 100);
+  }, 800);
 
   const initialBalance = user ? (user.wallet_balance || 0).toFixed(2) : '0.00';
   const roleLabel = role === 'student' ? '🎓 Campus Talent' : '💼 Platform Client';
@@ -144,7 +144,7 @@ function renderSidebar(role, active) {
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.75rem;padding-top:0.6rem;border-top:1px solid var(--border)">
           <span style="font-size:0.72rem;color:var(--text-secondary);font-weight:600">Wallet</span>
-          <span id="sidebar-wallet-value" style="font-family:var(--font-heading);font-weight:800;color:var(--success);font-size:0.88rem">${initialBalance} Cr</span>
+          <span id="sidebar-wallet-value" style="font-family:var(--font-heading);font-weight:800;color:var(--success);font-size:0.88rem">${formatMoney(initialBalance)}</span>
         </div>
       </div>
 
@@ -209,7 +209,7 @@ function formatDate(iso) {
 }
 
 function formatMoney(n) {
-  return "$" + Number(n || 0).toFixed(2);
+  return "₹" + Number(n || 0).toFixed(2);
 }
 
 // Interactive Premium Floating AI Chatbot Widget
@@ -333,15 +333,16 @@ function initAIChatbot() {
   }
 }
 
-// Auto-boot the AI Chatbot once DOM and assets are fully operational
+// Auto-boot the AI Chatbot and Notifications after page content is fully rendered
+// Defer both 2 seconds so the main dashboard data loads first (speeds up perceived performance)
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
     initAIChatbot();
-    initNotificationSystem();
+    setTimeout(initNotificationSystem, 2000);
   });
 } else {
   initAIChatbot();
-  initNotificationSystem();
+  setTimeout(initNotificationSystem, 2000);
 }
 
 
@@ -366,29 +367,26 @@ document.addEventListener("click", () => {
   if (drawer) drawer.style.display = "none";
 });
 
+let _lastNotifFetch = 0;
+
 function initNotificationSystem() {
-  // Sync starting alerts
+  // Initial notification fetch (already deferred 2s from init call site)
   fetchHeaderNotifications();
 
-  // Connect to Socket.IO real-time channel
-  setTimeout(() => {
-    const socketInstance = (typeof initSocket === "function") ? initSocket() : null;
-    if (socketInstance) {
-      socketInstance.on("notification", (data) => {
-        // Dynamic dynamic glow popup toasts
-        showToast(`🔔 ${data.title}: ${data.message}`, "info");
-        // Play notification audio alert
-        playNotificationSound();
-        // Dynamic increments of bubble unread counts
-        incrementUnreadBadge();
-        // Refresh local cache and list if drawer is open
-        const drawer = document.getElementById("header-notification-drawer");
-        if (drawer && drawer.style.display === "flex") {
-          fetchHeaderNotifications();
-        }
-      });
-    }
-  }, 1500);
+  // Connect to Socket.IO real-time channel (only once socket is ready)
+  const socketInstance = (typeof initSocket === "function") ? initSocket() : null;
+  if (socketInstance) {
+    socketInstance.on("notification", (data) => {
+      showToast(`🔔 ${data.title}: ${data.message}`, "info");
+      playNotificationSound();
+      incrementUnreadBadge();
+      // Refresh drawer only if it is actually visible
+      const drawer = document.getElementById("header-notification-drawer");
+      if (drawer && drawer.style.display === "flex") {
+        fetchHeaderNotifications();
+      }
+    });
+  }
 
   // Cross-tab synchronization via LocalStorage storage trigger
   window.addEventListener("storage", (e) => {
@@ -428,6 +426,10 @@ function incrementUnreadBadge() {
 
 function fetchHeaderNotifications() {
   if (typeof API === "undefined" || !localStorage.getItem("skillswap_access_token")) return;
+  // Rate-limit: don't re-fetch within 3 seconds
+  const now = Date.now();
+  if (now - _lastNotifFetch < 3000) return;
+  _lastNotifFetch = now;
   
   API.get("/notifications?unread=true").then((notes) => {
     const badge = document.getElementById("bell-unread-badge");

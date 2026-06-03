@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from backend.extensions import db, socketio
 from backend.models import (
     Project, Application, Review, Payment, SavedJob,
-    User, FreelancerProfile, Category, Notification, Wallet, Transaction
+    User, FreelancerProfile, Category, Notification, Wallet, Transaction, EscrowPayment
 )
 from backend.utils import create_notification
 from backend.middleware.security import sanitize_text, role_required
@@ -45,13 +45,25 @@ def list_projects():
         is_urgent_bool = is_urgent.lower() in ("true", "1", "yes")
         query = query.filter_by(is_urgent=is_urgent_bool)
         
-    projects = query.order_by(Project.is_featured.desc(), Project.created_at.desc()).limit(50).all()
+    from sqlalchemy.orm import joinedload
+    projects = query.options(
+        joinedload(Project.client),
+        joinedload(Project.category),
+        joinedload(Project.team),
+        joinedload(Project.applications)
+    ).order_by(Project.is_featured.desc(), Project.created_at.desc()).limit(50).all()
     return jsonify([p.to_dict() for p in projects])
 
 
 @projects_bp.route("/<int:project_id>", methods=["GET"])
 def get_project(project_id):
-    project = Project.query.get_or_404(project_id)
+    from sqlalchemy.orm import joinedload
+    project = Project.query.options(
+        joinedload(Project.client),
+        joinedload(Project.category),
+        joinedload(Project.team),
+        joinedload(Project.applications)
+    ).get_or_404(project_id)
     return jsonify(project.to_dict())
 
 
@@ -66,6 +78,12 @@ def create_project():
     budget = data.get("budget")
     if not title or not description or budget is None:
         return jsonify({"error": "Title, description, and budget required"}), 400
+    try:
+        budget_val = float(budget)
+        if budget_val <= 0 or budget_val > 10000:
+            return jsonify({"error": "Project budget must be between ₹1 and ₹10000."}), 400
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid budget value"}), 400
     deadline = None
     if data.get("deadline"):
         deadline = datetime.strptime(data["deadline"], "%Y-%m-%d").date()
@@ -113,7 +131,13 @@ def update_project(project_id):
     if "description" in data:
         project.description = sanitize_text(data["description"])
     if "budget" in data:
-        project.budget = data["budget"]
+        try:
+            budget_val = float(data["budget"])
+            if budget_val <= 0 or budget_val > 10000:
+                return jsonify({"error": "Project budget must be between ₹1 and ₹10000."}), 400
+            project.budget = budget_val
+        except (ValueError, TypeError):
+            return jsonify({"error": "Invalid budget value"}), 400
     if "status" in data:
         project.status = sanitize_text(data["status"])
     if "progress" in data:
@@ -125,10 +149,16 @@ def update_project(project_id):
 @projects_bp.route("/my", methods=["GET"])
 @jwt_required()
 def my_projects():
+    from sqlalchemy.orm import joinedload
     user_id = int(get_jwt_identity())
     user = User.query.get(user_id)
     if user.role.name == "client":
-        projects = Project.query.filter_by(client_id=user_id).order_by(Project.created_at.desc()).all()
+        projects = Project.query.options(
+            joinedload(Project.client),
+            joinedload(Project.category),
+            joinedload(Project.team),
+            joinedload(Project.applications)
+        ).filter_by(client_id=user_id).order_by(Project.created_at.desc()).all()
     else:
         apps = Application.query.filter_by(applicant_id=user_id, status="accepted").all()
         project_ids = [a.project_id for a in apps]
@@ -143,7 +173,12 @@ def my_projects():
         if team_ids:
             query_conditions.append(Project.team_id.in_(team_ids))
             
-        projects = Project.query.filter(or_(*query_conditions)).order_by(Project.created_at.desc()).all()
+        projects = Project.query.options(
+            joinedload(Project.client),
+            joinedload(Project.category),
+            joinedload(Project.team),
+            joinedload(Project.applications)
+        ).filter(or_(*query_conditions)).order_by(Project.created_at.desc()).all()
     return jsonify([p.to_dict() for p in projects])
 
 
@@ -161,11 +196,19 @@ def apply_project(project_id):
     cover = sanitize_text(data.get("cover_letter", ""))
     if not cover:
         return jsonify({"error": "Cover letter required"}), 400
+    proposed_rate = data.get("proposed_rate")
+    if proposed_rate is not None:
+        try:
+            rate_val = float(proposed_rate)
+            if rate_val <= 0 or rate_val > 10000:
+                return jsonify({"error": "Proposed bid amount must be between ₹1 and ₹10000."}), 400
+        except (ValueError, TypeError):
+            return jsonify({"error": "Invalid proposed rate value"}), 400
     app = Application(
         project_id=project_id,
         applicant_id=user_id,
         cover_letter=cover,
-        proposed_rate=data.get("proposed_rate"),
+        proposed_rate=proposed_rate,
     )
     db.session.add(app)
     db.session.commit()
@@ -178,14 +221,31 @@ def apply_project(project_id):
 @jwt_required()
 @role_required("client", "admin")
 def list_applications(project_id):
+    from sqlalchemy.orm import joinedload
+    from backend.models import FreelancerProfile as FP, PublicProfile as PP
+
     project = Project.query.get_or_404(project_id)
     user_id = int(get_jwt_identity())
     if project.client_id != user_id:
         user = User.query.get(user_id)
         if user.role.name != "admin":
             return jsonify({"error": "Forbidden"}), 403
-    apps = Application.query.filter_by(project_id=project_id).order_by(Application.created_at.desc()).all()
+
+    # Eager-load applicant + their FreelancerProfile and PublicProfile in one query set
+    apps = (
+        Application.query
+        .filter_by(project_id=project_id)
+        .options(
+            joinedload(Application.applicant)
+            .joinedload(User.freelancer_profile),
+            joinedload(Application.applicant)
+            .joinedload(User.public_profile),
+        )
+        .order_by(Application.created_at.desc())
+        .all()
+    )
     return jsonify([a.to_dict() for a in apps])
+
 
 
 @projects_bp.route("/applications/<int:app_id>", methods=["PUT"])
@@ -206,10 +266,50 @@ def update_application(app_id):
         client = User.query.get(project.client_id)
         budget = project.budget or 0
         if client.wallet_balance < budget:
-            return jsonify({"error": f"Insufficient wallet balance. This project requires {budget} credits, but you only have {client.wallet_balance}."}), 400
+            return jsonify({"error": f"Insufficient wallet balance. This project requires ₹{budget:.2f}, but you only have ₹{client.wallet_balance:.2f}."}), 400
         
-        # Deduct client credits
+        # Deduct client balance
         client.wallet_balance -= budget
+        
+        # Keep Wallet model in sync
+        client_wallet = Wallet.query.filter_by(user_id=project.client_id).first()
+        if client_wallet:
+            client_wallet.balance = float(client_wallet.balance) - float(budget)
+            client_wallet.pending_balance = float(client_wallet.pending_balance) + float(budget)
+        else:
+            client_wallet = Wallet(
+                user_id=project.client_id,
+                balance=float(client.wallet_balance),
+                pending_balance=float(budget),
+                total_earned=0.00,
+                total_spent=0.00
+            )
+            db.session.add(client_wallet)
+            
+        # Create EscrowPayment for the advanced payments desk
+        escrow = EscrowPayment(
+            project_id=project.id,
+            client_id=project.client_id,
+            freelancer_id=app.applicant_id,
+            amount=budget,
+            status="Escrowed",
+            milestone="Project Setup & Escrow Deposit"
+        )
+        db.session.add(escrow)
+
+        # Log transaction ledger
+        import uuid
+        ref = f"ESC-{uuid.uuid4().hex[:8].upper()}"
+        tx = Transaction(
+            sender_id=project.client_id,
+            receiver_id=app.applicant_id,
+            amount=budget,
+            type="escrow_lock",
+            status="completed",
+            reference_code=ref,
+            description=f"Locked ₹{budget:.2f} in escrow for: {project.title}."
+        )
+        db.session.add(tx)
         
         # Create escrowed payment
         escrow_payment = Payment(
@@ -229,7 +329,18 @@ def update_application(app_id):
             Application.id != app.id,
         ).update({"status": "rejected"})
         
-        create_notification(app.applicant_id, "Application Accepted", f"You were hired for {project.title}! {budget} credits are held in Escrow.", "success")
+        # Emit SocketIO updates to refresh frontend wallets
+        socketio.emit("wallet_updated", client_wallet.to_dict(), room=f"user_{project.client_id}")
+        socketio.emit("payment_notification", {
+            "title": "🔒 Escrow Funds Locked",
+            "message": f"Successfully established escrow. ₹{budget:,.2f} has been locked securely."
+        }, room=f"user_{project.client_id}")
+        socketio.emit("payment_notification", {
+            "title": "🤝 Hired & Escrow Funded!",
+            "message": f"Client funded escrow contract of ₹{budget:,.2f} for campaign '{project.title}'!"
+        }, room=f"user_{app.applicant_id}")
+
+        create_notification(app.applicant_id, "Application Accepted", f"You were hired for {project.title}! ₹{budget:,.2f} is held in Escrow.", "success")
     
     old_status = app.status
     app.status = status
@@ -245,8 +356,12 @@ def update_application(app_id):
 @jwt_required()
 @role_required("student")
 def my_applications():
+    from sqlalchemy.orm import joinedload
     user_id = int(get_jwt_identity())
-    apps = Application.query.filter_by(applicant_id=user_id).order_by(Application.created_at.desc()).all()
+    apps = Application.query.options(
+        joinedload(Application.project),
+        joinedload(Application.applicant)
+    ).filter_by(applicant_id=user_id).order_by(Application.created_at.desc()).all()
     return jsonify([a.to_dict() for a in apps])
 
 
@@ -254,10 +369,21 @@ def my_applications():
 @jwt_required()
 @role_required("student")
 def saved_jobs():
+    from sqlalchemy.orm import joinedload
     user_id = int(get_jwt_identity())
     if request.method == "GET":
         saved = SavedJob.query.filter_by(user_id=user_id).all()
-        return jsonify([Project.query.get(s.project_id).to_dict() for s in saved if Project.query.get(s.project_id)])
+        project_ids = [s.project_id for s in saved]
+        if not project_ids:
+            return jsonify([])
+        projects = Project.query.options(
+            joinedload(Project.client),
+            joinedload(Project.category),
+            joinedload(Project.team),
+            joinedload(Project.applications)
+        ).filter(Project.id.in_(project_ids)).all()
+        proj_map = {p.id: p for p in projects}
+        return jsonify([proj_map[pid].to_dict() for pid in project_ids if pid in proj_map])
     if request.method == "POST":
         pid = request.get_json().get("project_id")
         if not SavedJob.query.filter_by(user_id=user_id, project_id=pid).first():
@@ -281,17 +407,35 @@ def post_review(project_id):
     reviewee_id = data.get("reviewee_id")
     rating = int(data.get("rating", 0))
     comment = sanitize_text(data.get("comment", ""))
+    
     if rating < 1 or rating > 5:
         return jsonify({"error": "Rating must be 1-5"}), 400
-    review = Review(project_id=project_id, reviewer_id=user_id, reviewee_id=reviewee_id, rating=rating, comment=comment)
-    db.session.add(review)
+        
+    if project.client_id != user_id:
+        return jsonify({"error": "Unauthorized: Only the project client can review the freelancer."}), 403
+        
+    if reviewee_id != project.hired_freelancer_id:
+        return jsonify({"error": "Invalid reviewee: You can only review the hired freelancer."}), 400
+        
+    existing_review = Review.query.filter_by(project_id=project_id, reviewer_id=user_id, reviewee_id=reviewee_id).first()
+    if existing_review:
+        existing_review.rating = rating
+        existing_review.comment = comment
+        review = existing_review
+    else:
+        review = Review(project_id=project_id, reviewer_id=user_id, reviewee_id=reviewee_id, rating=rating, comment=comment)
+        db.session.add(review)
+        
+    db.session.flush()
+    
     profile = FreelancerProfile.query.filter_by(user_id=reviewee_id).first()
     if profile:
         reviews = Review.query.filter_by(reviewee_id=reviewee_id).all()
-        profile.rating_count = len(reviews) + 1
-        profile.rating_avg = sum(r.rating for r in reviews) / profile.rating_count
+        profile.rating_count = len(reviews)
+        profile.rating_avg = sum(r.rating for r in reviews) / len(reviews)
+        
     db.session.commit()
-    return jsonify(review.to_dict()), 201
+    return jsonify(review.to_dict()), 200 if existing_review else 201
 
 
 @projects_bp.route("/reviews/<int:user_id>", methods=["GET"])
@@ -320,6 +464,12 @@ def payments(project_id):
         escrow_payment.status = "completed"
         if data.get("milestone"):
             escrow_payment.milestone = sanitize_text(data["milestone"])
+
+        # Sync EscrowPayment model if exists
+        escrow = EscrowPayment.query.filter_by(project_id=project_id, status="Escrowed").first()
+        if escrow:
+            escrow.status = "Released"
+            escrow.released_at = datetime.utcnow()
             
         total_amount = float(escrow_payment.amount)
         from flask import current_app
@@ -394,7 +544,7 @@ def payments(project_id):
             type="escrow_release",
             status="completed",
             reference_code=ref,
-            description=f"Released payout of {net_amount} credits (after 5% platform fee) for completing: {project.title}."
+            description=f"Released payout of ₹{net_amount:.2f} (after 5% platform fee) for completing: {project.title}."
         )
         db.session.add(pay_tx)
         
@@ -413,13 +563,13 @@ def payments(project_id):
         # Try to trigger WebSocket updates
         try:
             from backend.payments.routes import trigger_payment_alert
-            trigger_payment_alert(escrow_payment.payee_id, "🎉 Available Earnings Updated!", f"Escrow payout of {net_amount} released (after 5% fee)!")
+            trigger_payment_alert(escrow_payment.payee_id, "🎉 Available Earnings Updated!", f"Escrow payout of ₹{net_amount:,.2f} released (after 5% fee)!")
             if admin_user:
-                trigger_payment_alert(admin_user.id, "📈 Fee Earned", f"Platform fee of {commission} received!")
+                trigger_payment_alert(admin_user.id, "📈 Fee Earned", f"Platform fee of ₹{commission:,.2f} received!")
         except Exception:
             pass
             
-        create_notification(escrow_payment.payee_id, "Payment Released from Escrow", f"You received {net_amount} credits (after 5% platform fee of {commission}) for completing {project.title}!", "success")
+        create_notification(escrow_payment.payee_id, "Payment Released from Escrow", f"You received ₹{net_amount:,.2f} (after 5% platform fee of ₹{commission:,.2f}) for completing {project.title}!", "success")
         return jsonify(escrow_payment.to_dict()), 200
         
     else:
@@ -432,7 +582,7 @@ def payments(project_id):
             return jsonify({"error": "Payee required"}), 400
             
         if payer.wallet_balance < amount:
-            return jsonify({"error": f"Insufficient wallet balance. You need {amount} credits, but only have {payer.wallet_balance}."}), 400
+            return jsonify({"error": f"Insufficient wallet balance. You need ₹{amount:.2f}, but only have ₹{payer.wallet_balance:.2f}."}), 400
             
         payer.wallet_balance -= amount
         
@@ -458,7 +608,7 @@ def payments(project_id):
         project.progress = 100
         
         db.session.commit()
-        create_notification(payee_id, "Direct Payment Received", f"You received {amount} credits for {project.title}!", "payment")
+        create_notification(payee_id, "Direct Payment Received", f"You received ₹{amount:,.2f} for {project.title}!", "payment")
         return jsonify(payment.to_dict()), 201
 
 

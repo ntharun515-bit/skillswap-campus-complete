@@ -29,6 +29,7 @@ class User(db.Model):
 
     role = db.relationship("Role", back_populates="users")
     freelancer_profile = db.relationship("FreelancerProfile", back_populates="user", uselist=False)
+    public_profile = db.relationship("PublicProfile", back_populates="user", uselist=False, foreign_keys="PublicProfile.user_id")
     projects_posted = db.relationship("Project", back_populates="client", foreign_keys="Project.client_id")
     applications = db.relationship("Application", back_populates="applicant")
     reviews_given = db.relationship("Review", back_populates="reviewer", foreign_keys="Review.reviewer_id")
@@ -248,12 +249,22 @@ class Application(db.Model):
     applicant = db.relationship("User", back_populates="applications")
 
     def to_dict(self):
+        # Use pre-loaded relationship data (avoids N+1 queries when joinedload is used)
+        fp = self.applicant.freelancer_profile if self.applicant else None
+        pub = self.applicant.public_profile if self.applicant else None
+        pub_slug = pub.slug if pub else None
+
         return {
             "id": self.id,
             "project_id": self.project_id,
             "project_title": self.project.title if self.project else None,
             "applicant_id": self.applicant_id,
             "applicant_name": self.applicant.full_name if self.applicant else None,
+            "applicant_headline": fp.headline if fp else None,
+            "applicant_level": fp.level if fp else "Rookie",
+            "applicant_rating_avg": round(float(fp.rating_avg), 1) if fp and fp.rating_avg else 0.0,
+            "applicant_rating_count": fp.rating_count if fp else 0,
+            "applicant_slug": pub_slug,
             "cover_letter": self.cover_letter,
             "proposed_rate": float(self.proposed_rate) if self.proposed_rate else None,
             "status": self.status,
@@ -726,7 +737,7 @@ class PublicProfile(db.Model):
     linkedin_url = db.Column(db.String(255))
     portfolio_views = db.Column(db.Integer, default=0)
 
-    user = db.relationship("User")
+    user = db.relationship("User", back_populates="public_profile")
     projects = db.relationship("PortfolioProject", back_populates="profile", cascade="all, delete-orphan")
     reviews = db.relationship("ProfileReview", back_populates="profile", cascade="all, delete-orphan")
 
@@ -871,6 +882,7 @@ class EscrowPayment(db.Model):
             "id": self.id,
             "project_id": self.project_id,
             "project_title": self.project.title if self.project else "N/A",
+            "project_status": self.project.status if self.project else "N/A",
             "client_id": self.client_id,
             "client_name": self.client.full_name if self.client else "Client",
             "freelancer_id": self.freelancer_id,

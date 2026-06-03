@@ -10,7 +10,7 @@ from flask_jwt_extended import (
     unset_jwt_cookies,
 )
 from backend.extensions import db, limiter
-from backend.models import User, Role, FreelancerProfile
+from backend.models import User, Role, FreelancerProfile, UserSkill
 from backend.utils import hash_password, verify_password, create_notification
 from backend.middleware.security import sanitize_text, log_activity
 
@@ -137,7 +137,12 @@ def refresh():
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required()
 def me():
-    user = User.query.get(int(get_jwt_identity()))
+    from sqlalchemy.orm import joinedload
+    user = User.query.options(
+        joinedload(User.freelancer_profile)
+        .joinedload(FreelancerProfile.skills)
+        .joinedload(UserSkill.skill)
+    ).get(int(get_jwt_identity()))
     if not user:
         return jsonify({"error": "User not found"}), 404
     data = user.to_dict(include_email=True)

@@ -60,7 +60,7 @@
             const isVerified = f.is_verified || false;
             const isAvailable = f.availability === 'available';
             const avgRating = f.rating_avg || 0;
-            const rateText = f.hourly_rate ? `${f.hourly_rate} Cr/Hr` : 'Custom Rate';
+            const rateText = f.hourly_rate ? `₹${f.hourly_rate}/Hr` : 'Custom Rate';
 
             const verifiedBadge = isVerified 
               ? `<span class="badge" style="background:rgba(16,185,129,0.15);color:var(--success)">🛡️ Verified Pro</span>` 

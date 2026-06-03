@@ -180,7 +180,7 @@
               <!-- Handoff review action console -->
               <div style="display:none;gap:0.5rem" id="review-action-console">
                 <button class="btn btn-ghost btn-sm" onclick="requestProjectRevision()">⚠️ Request Revision</button>
-                <button class="btn btn-primary btn-sm" onclick="releaseEscrowPayment()">✅ Approve & Release Payout</button>
+                <button class="btn btn-primary btn-sm" onclick="openReviewModal()">✅ Approve & Release Payout</button>
               </div>
             </div>
           </article>
@@ -196,7 +196,7 @@
                 <div style="margin-top:1rem;padding:1rem;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--radius-lg)">
                   <div style="display:flex;justify-content:between;margin-bottom:0.5rem">
                     <span style="font-size:0.85rem;color:var(--text-secondary)">Escrow Amount</span>
-                    <strong style="color:var(--success)" id="escrow-budget">0.00 Cr</strong>
+                    <strong style="color:var(--success)" id="escrow-budget">₹0.00</strong>
                   </div>
                   <div style="display:flex;justify-content:between;margin-bottom:1rem">
                     <span style="font-size:0.85rem;color:var(--text-secondary)">Milestone Note</span>
@@ -287,7 +287,7 @@
               <h3>📋 Submission Review</h3>
               <div id="ws-review-status"><p>No deliverables submitted yet.</p></div>
               <div id="ws-review-actions" style="display:none;display:flex;flex-direction:column;gap:0.75rem">
-                <button class="btn btn-primary" onclick="releaseEscrowPayment()">✅ Approve &amp; Release Payment</button>
+                <button class="btn btn-primary" onclick="openReviewModal()">✅ Approve &amp; Release Payment</button>
                 <button class="btn btn-ghost" onclick="requestProjectRevision()">⚠️ Request Revision</button>
                 <button class="btn btn-ghost" style="color:var(--danger);border-color:var(--danger)" onclick="triggerMilestoneDispute()">⚖️ Open Dispute</button>
               </div>
@@ -318,6 +318,32 @@
             <div style="display:flex;justify-content:end;gap:0.75rem">
               <button class="btn btn-ghost" onclick="closeTaskModal()">Cancel</button>
               <button class="btn btn-primary" onclick="createTaskCard()">Save Card</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rating & Review modal layout overlay -->
+        <div class="overlay-modal" id="review-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:999;align-items:center;justify-content:center">
+          <div class="glass card" style="max-width:450px;width:90%">
+            <h2>⭐ Rate & Review Freelancer</h2>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-top:0.25rem">Please rate the freelancer's work quality before releasing the escrow payment.</p>
+            <div style="margin-top:1.25rem">
+              <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.4rem">Overall Rating</label>
+              <div style="display:flex;gap:0.4rem;margin-bottom:0.75rem;font-size:1.5rem;color:var(--warning)" id="workspace-rating-stars">
+                <span style="cursor:pointer" onclick="setWorkspaceRating(1)">⭐</span>
+                <span style="cursor:pointer" onclick="setWorkspaceRating(2)">⭐</span>
+                <span style="cursor:pointer" onclick="setWorkspaceRating(3)">⭐</span>
+                <span style="cursor:pointer" onclick="setWorkspaceRating(4)">⭐</span>
+                <span style="cursor:pointer" onclick="setWorkspaceRating(5)">⭐</span>
+                <span style="font-size:0.9rem;color:var(--text-secondary);margin-left:0.5rem;align-self:center" id="workspace-rating-label">Rating: 5/5</span>
+              </div>
+
+              <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.25rem">Review Comment</label>
+              <textarea id="workspace-review-comment" class="form-control" placeholder="Write a short review of the freelancer's work..." style="width:100%;height:80px;margin-bottom:1rem"></textarea>
+            </div>
+            <div style="display:flex;justify-content:end;gap:0.75rem">
+              <button class="btn btn-ghost" onclick="closeReviewModal()">Cancel</button>
+              <button class="btn btn-primary" onclick="submitReviewAndReleasePayout()">Submit & Release Payout</button>
             </div>
           </div>
         </div>
@@ -363,6 +389,9 @@
       refreshWorkspaceData(pid);
     }
 
+    let currentWorkspaceProject = null;
+    let selectedWorkspaceRating = 5;
+
     function refreshWorkspaceData(pid) {
       Promise.all([
         API.get(`/projects/${pid}`),
@@ -371,6 +400,7 @@
         API.get(`/projects/${pid}/files`),
         API.get(`/projects/${pid}/payments`)
       ]).then(([project, timeline, tasks, files, payments]) => {
+        currentWorkspaceProject = project;
         
         // 1. Sync Progress Timeline nodes
         document.getElementById('lifecycle-status-label').textContent = `Status: ${project.status.toUpperCase()}`;
@@ -401,7 +431,7 @@
         // 2. Render Escrow card
         const escrow = payments.find(p => p.status === 'escrowed' || p.status === 'disputed');
         if (escrow) {
-          document.getElementById('escrow-budget').textContent = escrow.amount.toFixed(2) + ' Cr';
+          document.getElementById('escrow-budget').textContent = formatMoney(escrow.amount);
           document.getElementById('escrow-milestone').textContent = escrow.milestone || 'Project Escrow Deposit';
         } else {
           document.getElementById('escrow-budget').textContent = 'Released / Completed';
@@ -648,23 +678,84 @@
       return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    // Approving and Releasing Escrowed Payout
-    function releaseEscrowPayment() {
-      const pid = document.getElementById('workspace-project-select').value;
-      
-      API.post(`/projects/${pid}/payments`, {
-        milestone: "Final Handoff Review Approved & Credits Released"
+    function openReviewModal() {
+      selectedWorkspaceRating = 5;
+      document.getElementById('workspace-rating-label').textContent = 'Rating: 5/5';
+      document.getElementById('workspace-review-comment').value = '';
+      updateWorkspaceStars(5);
+      document.getElementById('review-modal').style.display = 'flex';
+    }
+
+    function closeReviewModal() {
+      document.getElementById('review-modal').style.display = 'none';
+    }
+
+    function setWorkspaceRating(val) {
+      selectedWorkspaceRating = val;
+      document.getElementById('workspace-rating-label').textContent = `Rating: ${val}/5`;
+      updateWorkspaceStars(val);
+    }
+
+    function updateWorkspaceStars(val) {
+      const starsContainer = document.getElementById('workspace-rating-stars');
+      const stars = starsContainer.getElementsByTagName('span');
+      for (let i = 0; i < 5; i++) {
+        if (i < val) {
+          stars[i].style.opacity = '1';
+        } else {
+          stars[i].style.opacity = '0.35';
+        }
+      }
+    }
+
+    function submitReviewAndReleasePayout() {
+      if (!currentWorkspaceProject) {
+        showToast('No active project loaded in workspace.', 'error');
+        return;
+      }
+      const pid = currentWorkspaceProject.id;
+      const comment = document.getElementById('workspace-review-comment').value.trim();
+      const revieweeId = currentWorkspaceProject.hired_freelancer_id;
+
+      if (!revieweeId) {
+        showToast('No freelancer associated with this project.', 'error');
+        return;
+      }
+
+      if (!comment) {
+        showToast('Please provide a review comment for the freelancer.', 'warning');
+        return;
+      }
+
+      const submitBtn = document.querySelector('#review-modal .btn-primary');
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ Processing...';
+
+      // 1. Submit rating & review
+      API.post(`/projects/${pid}/reviews`, {
+        reviewee_id: revieweeId,
+        rating: selectedWorkspaceRating,
+        comment: comment
       }).then(() => {
-        // Log timeline release completion
-        return API.post(`/projects/${pid}/timeline`, {
-          status: "completed",
-          details: "Client approved final inspect and released locked Escrow credits."
+        // 2. Approve & Release Escrowed Payout
+        return API.post(`/projects/${pid}/payments`, {
+          milestone: "Final Handoff Review Approved & Rupees Released"
         });
       }).then(() => {
-        showToast('🎉 Milestones completely settled! Credits transferred successfully!', 'success');
+        // 3. Log timeline release completion
+        return API.post(`/projects/${pid}/timeline`, {
+          status: "completed",
+          details: `Client approved final inspect, left a ${selectedWorkspaceRating}-star review, and released locked Escrow Rupees.`
+        });
+      }).then(() => {
+        showToast('🎉 Project completed, review saved, and Rupees released successfully!', 'success');
+        closeReviewModal();
         refreshWorkspaceData(pid);
       }).catch(err => {
-        showToast('Payout release failed: ' + err.message, 'error');
+        showToast('Action failed: ' + err.message, 'error');
+      }).finally(() => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit & Release Payout';
       });
     }
 

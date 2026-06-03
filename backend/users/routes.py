@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy import or_
 from backend.extensions import db
-from backend.models import User, FreelancerProfile, Skill, UserSkill, PortfolioItem, SavedFreelancer
+from backend.models import User, FreelancerProfile, Skill, UserSkill, PortfolioItem, SavedFreelancer, Wallet, Transaction
 from backend.utils import save_upload, create_notification
 from backend.middleware.security import sanitize_text, role_required, log_activity
 
@@ -216,8 +216,42 @@ def update_settings():
         user.email = new_email
     if "deposit_amount" in data:
         amount = float(data["deposit_amount"])
-        if amount > 0:
-            user.wallet_balance += amount
+        if amount <= 0 or amount > 10000:
+            return jsonify({"error": "Deposit amount must be between ₹1 and ₹10000."}), 400
+        user.wallet_balance += amount
+        wallet = Wallet.query.filter_by(user_id=user.id).first()
+        if wallet:
+            wallet.balance = float(wallet.balance) + amount
+        else:
+            wallet = Wallet(
+                user_id=user.id,
+                balance=amount,
+                pending_balance=0.00,
+                total_earned=0.00,
+                total_spent=0.00
+            )
+            db.session.add(wallet)
+        import uuid
+        ref = f"DEP-{uuid.uuid4().hex[:8].upper()}"
+        tx = Transaction(
+            sender_id=None,
+            receiver_id=user.id,
+            amount=amount,
+            type="deposit",
+            status="completed",
+            reference_code=ref,
+            description="Deposited virtual wallet Rupees via Settings."
+        )
+        db.session.add(tx)
+        try:
+            from backend.extensions import socketio
+            socketio.emit("wallet_updated", wallet.to_dict(), room=f"user_{user.id}")
+            socketio.emit("payment_notification", {
+                "title": "💰 Rupees Added Successfully!",
+                "message": f"Successfully added ₹{amount:,.2f} to your active wallet."
+            }, room=f"user_{user.id}")
+        except Exception:
+            pass
     db.session.commit()
     return jsonify({"message": "Settings updated", "user": user.to_dict(include_email=True)})
 
@@ -271,18 +305,30 @@ from backend.models import Achievement
 
 @users_bp.route("/leaderboard", methods=["GET"])
 def get_leaderboard():
-    profiles = FreelancerProfile.query.join(User).filter(
+    from sqlalchemy.orm import joinedload
+    from sqlalchemy import func
+    profiles = FreelancerProfile.query.options(
+        joinedload(FreelancerProfile.user)
+    ).join(User).filter(
         User.is_active == True, User.is_banned == False
     ).order_by(FreelancerProfile.xp.desc(), FreelancerProfile.rating_avg.desc()).limit(10).all()
     
+    user_ids = [p.user_id for p in profiles]
+    ach_map = {}
+    if user_ids:
+        ach_counts = db.session.query(Achievement.user_id, func.count(Achievement.id))\
+            .filter(Achievement.user_id.in_(user_ids))\
+            .group_by(Achievement.user_id).all()
+        ach_map = {uid: count for uid, count in ach_counts}
+        
     result = []
     for index, p in enumerate(profiles):
-        ach_count = Achievement.query.filter_by(user_id=p.user_id).count()
+        ach_count = ach_map.get(p.user_id, 0)
         result.append({
             "rank": index + 1,
             "user_id": p.user_id,
-            "full_name": p.user.full_name,
-            "profile_picture": p.user.profile_picture,
+            "full_name": p.user.full_name if p.user else "Student",
+            "profile_picture": p.user.profile_picture if p.user else None,
             "level": p.level or "Rookie",
             "xp": p.xp or 0,
             "rating_avg": p.rating_avg,
@@ -406,15 +452,52 @@ from backend.models import PublicProfile, PortfolioProject, ProfileReview
 @users_bp.route("/public/<string:slug>", methods=["GET"])
 def get_public_profile(slug):
     """Retrieve public profile lookup by custom slug (LinkedIn/Behance alternative)."""
+    from backend.models import Application, Project
     p = PublicProfile.query.filter_by(slug=slug).first()
     if not p:
         return jsonify({"error": "Public profile not found"}), 404
-    
+
     # Increment portfolio views (analytical tracking)
     p.portfolio_views += 1
     db.session.commit()
-    
-    return jsonify(p.to_dict())
+
+    data = p.to_dict()
+
+    # --- Attach project history (ongoing + completed) from accepted applications ---
+    accepted_apps = (
+        Application.query
+        .filter_by(applicant_id=p.user_id, status="accepted")
+        .all()
+    )
+
+    ongoing_projects = []
+    completed_projects = []
+
+    for app in accepted_apps:
+        proj = app.project
+        if not proj:
+            continue
+        proj_data = {
+            "id": proj.id,
+            "title": proj.title,
+            "description": proj.description[:180] + "…" if proj.description and len(proj.description) > 180 else (proj.description or ""),
+            "budget": float(proj.budget),
+            "skills_required": proj.skills_required or "",
+            "tags": proj.tags or "",
+            "status": proj.status,
+            "progress": proj.progress or 0,
+            "created_at": proj.created_at.isoformat() if proj.created_at else None,
+            "client_name": proj.client.full_name if proj.client else "Client",
+        }
+        if proj.status in ("in_progress", "under_review", "revision_requested", "submitted", "hiring"):
+            ongoing_projects.append(proj_data)
+        elif proj.status in ("completed",):
+            completed_projects.append(proj_data)
+
+    data["ongoing_projects"] = ongoing_projects
+    data["completed_projects"] = completed_projects
+
+    return jsonify(data)
 
 
 @users_bp.route("/public-profile/me", methods=["GET", "PUT"])

@@ -77,11 +77,19 @@ def skill_suggestions():
 @ai_bp.route("/project-matches", methods=["GET"])
 @jwt_required()
 def project_matches():
-    user = User.query.get(int(get_jwt_identity()))
+    from sqlalchemy.orm import joinedload
+    user = User.query.options(
+        joinedload(User.freelancer_profile).joinedload(FreelancerProfile.skills).joinedload(UserSkill.skill)
+    ).get(int(get_jwt_identity()))
     profile = user.freelancer_profile
     if not profile:
         return jsonify([])
-    projects = Project.query.filter_by(status="open").limit(20).all()
+    projects = Project.query.options(
+        joinedload(Project.client),
+        joinedload(Project.category),
+        joinedload(Project.team),
+        joinedload(Project.applications)
+    ).filter_by(status="open").limit(20).all()
     matches = [{"project": p.to_dict(), "match_score": _match_score(p, profile)} for p in projects]
     matches.sort(key=lambda x: x["match_score"], reverse=True)
     return jsonify(matches[:10])
@@ -90,8 +98,12 @@ def project_matches():
 @ai_bp.route("/freelancer-recommendations/<int:project_id>", methods=["GET"])
 @jwt_required()
 def freelancer_recommendations(project_id):
+    from sqlalchemy.orm import joinedload
     project = Project.query.get_or_404(project_id)
-    profiles = FreelancerProfile.query.limit(30).all()
+    profiles = FreelancerProfile.query.options(
+        joinedload(FreelancerProfile.user),
+        joinedload(FreelancerProfile.skills).joinedload(UserSkill.skill)
+    ).limit(30).all()
     recs = [{"freelancer": p.to_dict(), "match_score": _match_score(project, p)} for p in profiles]
     recs.sort(key=lambda x: x["match_score"], reverse=True)
     return jsonify(recs[:10])
@@ -99,13 +111,22 @@ def freelancer_recommendations(project_id):
 
 @ai_bp.route("/smart-search", methods=["GET"])
 def smart_search():
+    from sqlalchemy.orm import joinedload
     q = request.args.get("q", "").lower()
     if not q:
         return jsonify({"projects": [], "freelancers": []})
-    projects = Project.query.filter(
+    projects = Project.query.options(
+        joinedload(Project.client),
+        joinedload(Project.category),
+        joinedload(Project.team),
+        joinedload(Project.applications)
+    ).filter(
         (Project.title.ilike(f"%{q}%")) | (Project.description.ilike(f"%{q}%"))
     ).limit(10).all()
-    profiles = FreelancerProfile.query.join(User).filter(
+    profiles = FreelancerProfile.query.options(
+        joinedload(FreelancerProfile.user),
+        joinedload(FreelancerProfile.skills).joinedload(UserSkill.skill)
+    ).join(User).filter(
         (User.full_name.ilike(f"%{q}%")) | (FreelancerProfile.headline.ilike(f"%{q}%"))
     ).limit(10).all()
     keywords = re.findall(r"\w+", q)
@@ -158,21 +179,21 @@ def chatbot():
             "reply": f"SkillSwap is thriving! We currently have **{u_count} registered members**, including **{f_count} active student freelancers** ready to share skills."
         })
 
-    if "balance" in message or "wallet" in message or "credits" in message or "my money" in message:
+    if "balance" in message or "wallet" in message or "credits" in message or "my money" in message or "rupee" in message or "rupees" in message:
         if user_id:
             user = User.query.get(user_id)
             if user:
                 return jsonify({
-                    "reply": f"Hello {user.full_name}! Your current wallet balance is **{user.wallet_balance:.2f} credits**. Clients can use credits to fund projects, and students receive them upon milestone approvals!"
+                    "reply": f"Hello {user.full_name}! Your current wallet balance is **₹{user.wallet_balance:.2f}**. Clients can use Rupees to fund projects, and students receive them upon milestone approvals!"
                 })
         return jsonify({
-            "reply": "Every client starts with **1000.00 credits** in their wallet. When you hire a freelancer, the project budget is held in Escrow and safely released once the work is complete. Log in to check your active balance!"
+            "reply": "Every client starts with **₹1000.00** in their wallet. When you hire a freelancer, the project budget is held in Escrow and safely released once the work is complete. Log in to check your active balance!"
         })
 
     # Standard guide replies
     replies = {
-        "hello": "Hello! I'm your SkillSwap AI Campus Assistant. Ask me about open projects, top freelancers, platform statistics, or your credit wallet balance!",
-        "hi": "Hi there! I'm SkillSwap AI. Ask me about open projects, top freelancers, platform statistics, or your credit wallet balance!",
+        "hello": "Hello! I'm your SkillSwap AI Campus Assistant. Ask me about open projects, top freelancers, platform statistics, or your wallet balance!",
+        "hi": "Hi there! I'm SkillSwap AI. Ask me about open projects, top freelancers, platform statistics, or your wallet balance!",
         "project": "Clients can post projects with a set budget from their dashboard. Students can browse projects, submit applications, and pitch their rates.",
         "pay": "We use a secure virtual Escrow system! Project funds are locked when a student is hired and released directly to their wallet upon completion.",
         "verify": "Students can submit skill verification requests. Administrators review documentation or you can take a platform skill quiz!",
@@ -632,8 +653,14 @@ def get_career_roadmap():
         })
         
     # Grab open projects matching the target skills
+    from sqlalchemy.orm import joinedload
     matching_projects = []
-    open_projects = Project.query.filter_by(status="open").all()
+    open_projects = Project.query.options(
+        joinedload(Project.client),
+        joinedload(Project.category),
+        joinedload(Project.team),
+        joinedload(Project.applications)
+    ).filter_by(status="open").all()
     for p in open_projects:
         req = (p.skills_required or "").lower()
         if any(s.lower() in req for s in selected["skills"]):

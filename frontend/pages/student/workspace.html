@@ -297,7 +297,7 @@
                   <div style="margin-top:1rem;padding:1rem;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:var(--radius-lg)">
                     <div style="display:flex;justify-content:space-between;margin-bottom:0.5rem">
                       <span style="font-size:0.85rem;color:var(--text-secondary)">Escrow Amount</span>
-                      <strong style="color:var(--success)" id="escrow-budget">0.00 Cr</strong>
+                      <strong style="color:var(--success)" id="escrow-budget">₹0.00</strong>
                     </div>
                     <div style="display:flex;justify-content:space-between;margin-bottom:1rem">
                       <span style="font-size:0.85rem;color:var(--text-secondary)">Milestone Note</span>
@@ -617,7 +617,7 @@
         // 2. Render Escrow card
         const escrow = payments.find(p => p.status === 'escrowed' || p.status === 'disputed');
         if (escrow) {
-          document.getElementById('escrow-budget').textContent = escrow.amount.toFixed(2) + ' Cr';
+          document.getElementById('escrow-budget').textContent = formatMoney(escrow.amount);
           document.getElementById('escrow-milestone').textContent = escrow.milestone || 'Project Escrow Deposit';
         } else {
           document.getElementById('escrow-budget').textContent = 'Released / Completed';
@@ -935,7 +935,7 @@
         statusEl.innerHTML = `
           <div style="padding:0.75rem;border:1px solid var(--success);border-radius:var(--radius-md);background:rgba(16,185,129,0.06);font-size:0.85rem">
             <span style="font-weight:700;color:var(--success)">✅ Contract Settled</span>
-            <p style="margin-top:0.25rem;color:var(--text-secondary)">All credits successfully released to your wallet!</p>
+            <p style="margin-top:0.25rem;color:var(--text-secondary)">All Rupees successfully released to your wallet!</p>
           </div>`;
         formEl.style.display = 'none';
       } else {
@@ -1167,7 +1167,7 @@
                       <a href="workspace.html?project=${tp.id}" class="bookmark-card" style="margin:0;text-decoration:none">
                         <span class="bookmark-title">${tp.title}</span>
                         <div class="bookmark-meta">
-                          <span style="color:var(--success)">${tp.budget} Cr</span>
+                          <span style="color:var(--success)">${formatMoney(tp.budget)}</span>
                           <span>${tp.status.toUpperCase()}</span>
                         </div>
                       </a>

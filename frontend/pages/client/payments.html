@@ -92,23 +92,23 @@
           </div>
 
           <div style="display:flex;flex-direction:column;gap:1.5rem">
-            <!-- Top Up Virtual Credits Panel -->
+            <!-- Top Up Virtual Rupees Panel -->
             <article class="glass card glowing-wallet">
-              <h3 style="font-family:var(--font-heading);color:var(--accent);margin-bottom:0.25rem">💰 Top Up Credits</h3>
-              <p style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:1.25rem">Instantly add virtual credits to fund project hires.</p>
+              <h3 style="font-family:var(--font-heading);color:var(--accent);margin-bottom:0.25rem">💰 Top Up Rupees</h3>
+              <p style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:1.25rem">Instantly add virtual Rupees to fund project hires.</p>
               
               <div style="margin-bottom:1rem">
                 <label style="font-size:0.75rem;color:var(--text-secondary);display:block;margin-bottom:0.4rem">Select Quick Amount:</label>
                 <div style="display:flex;gap:0.4rem;flex-wrap:wrap">
-                  <button class="fund-quick-btn" onclick="setTopUpAmount(100)">$100</button>
-                  <button class="fund-quick-btn" onclick="setTopUpAmount(500)">$500</button>
-                  <button class="fund-quick-btn" onclick="setTopUpAmount(1000)">$1000</button>
-                  <button class="fund-quick-btn" onclick="setTopUpAmount(2500)">$2500</button>
+                  <button class="fund-quick-btn" onclick="setTopUpAmount(100)">₹100</button>
+                  <button class="fund-quick-btn" onclick="setTopUpAmount(500)">₹500</button>
+                  <button class="fund-quick-btn" onclick="setTopUpAmount(1000)">₹1000</button>
+                  <button class="fund-quick-btn" onclick="setTopUpAmount(2500)">₹2500</button>
                 </div>
               </div>
 
               <div style="display:flex;gap:0.5rem;margin-bottom:1.25rem">
-                <input type="number" id="topup-amount-input" class="form-control" placeholder="Custom Amount" min="1" max="5000" style="background:rgba(0,0,0,0.3)">
+                <input type="number" id="topup-amount-input" class="form-control" placeholder="Custom Amount" min="1" max="10000" style="background:rgba(0,0,0,0.3)">
                 <button onclick="executeTopUp()" class="btn btn-primary">Deposit</button>
               </div>
             </article>
@@ -127,11 +127,37 @@
               <div style="font-size:0.75rem;color:var(--text-secondary);line-height:1.5">
                 <p style="margin-bottom:0.5rem"><strong>1. Hire:</strong> Budget locked from available balance.</p>
                 <p style="margin-bottom:0.5rem"><strong>2. Develop:</strong> Funds protected until milestones complete.</p>
-                <p><strong>3. Disburse:</strong> One-click release transfers credits to student's earnings.</p>
+                <p><strong>3. Disburse:</strong> One-click release transfers Rupees to student's earnings.</p>
               </div>
             </article>
           </div>
 
+        </div>
+
+        <!-- Rating & Review modal layout overlay -->
+        <div class="overlay-modal" id="review-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:999;align-items:center;justify-content:center">
+          <div class="glass card" style="max-width:450px;width:90%">
+            <h2>⭐ Rate & Review Freelancer</h2>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-top:0.25rem">Please rate the freelancer's work quality before releasing the escrow payment.</p>
+            <div style="margin-top:1.25rem">
+              <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.4rem">Overall Rating</label>
+              <div style="display:flex;gap:0.4rem;margin-bottom:0.75rem;font-size:1.5rem;color:var(--warning)" id="workspace-rating-stars">
+                <span style="cursor:pointer" onclick="setWorkspaceRating(1)">⭐</span>
+                <span style="cursor:pointer" onclick="setWorkspaceRating(2)">⭐</span>
+                <span style="cursor:pointer" onclick="setWorkspaceRating(3)">⭐</span>
+                <span style="cursor:pointer" onclick="setWorkspaceRating(4)">⭐</span>
+                <span style="cursor:pointer" onclick="setWorkspaceRating(5)">⭐</span>
+                <span style="font-size:0.9rem;color:var(--text-secondary);margin-left:0.5rem;align-self:center" id="workspace-rating-label">Rating: 5/5</span>
+              </div>
+
+              <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.25rem">Review Comment</label>
+              <textarea id="workspace-review-comment" class="form-control" placeholder="Write a short review of the freelancer's work..." style="width:100%;height:80px;margin-bottom:1rem"></textarea>
+            </div>
+            <div style="display:flex;justify-content:end;gap:0.75rem">
+              <button class="btn btn-ghost" onclick="closeReviewModal()">Cancel</button>
+              <button class="btn btn-primary" onclick="submitReviewAndReleasePayout()">Submit & Release Payout</button>
+            </div>
+          </div>
         </div>
       `;
 
@@ -147,13 +173,13 @@
         const input = document.getElementById('topup-amount-input');
         const amount = parseFloat(input.value);
 
-        if (!amount || amount <= 0 || amount > 5000) {
-          showToast('Please enter a valid amount between $1 and $5000.', 'warning');
+        if (!amount || amount <= 0 || amount > 10000) {
+          showToast('Please enter a valid amount between ₹1 and ₹10000.', 'warning');
           return;
         }
 
         API.post('/wallet/add-funds', { amount }).then(res => {
-          showToast('💰 Virtual credits added successfully!', 'success');
+          showToast('💰 Virtual Rupees added successfully!', 'success');
           input.value = '';
           loadWalletDesk();
         }).catch(err => {
@@ -162,15 +188,76 @@
       };
 
       // Release Escrow trigger
-      window.releaseProjectEscrow = function(projectId) {
-        if (!confirm('💸 Confirm release of escrow funds? Student earnings will be updated immediately.')) return;
+      let selectedWorkspaceRating = 5;
+      let reviewTargetProjectId = null;
+      let reviewTargetFreelancerId = null;
 
-        API.post('/payments/release', { project_id: projectId }).then(() => {
-          showToast('🎉 Escrow payout released successfully!', 'success');
+      window.openReviewModal = function(projectId, freelancerId) {
+        reviewTargetProjectId = projectId;
+        reviewTargetFreelancerId = freelancerId;
+        selectedWorkspaceRating = 5;
+        document.getElementById('workspace-rating-label').textContent = 'Rating: 5/5';
+        document.getElementById('workspace-review-comment').value = '';
+        updateWorkspaceStars(5);
+        document.getElementById('review-modal').style.display = 'flex';
+      };
+
+      window.closeReviewModal = function() {
+        document.getElementById('review-modal').style.display = 'none';
+      };
+
+      window.setWorkspaceRating = function(val) {
+        selectedWorkspaceRating = val;
+        document.getElementById('workspace-rating-label').textContent = `Rating: ${val}/5`;
+        updateWorkspaceStars(val);
+      };
+
+      window.updateWorkspaceStars = function(val) {
+        const starsContainer = document.getElementById('workspace-rating-stars');
+        if (!starsContainer) return;
+        const stars = starsContainer.getElementsByTagName('span');
+        for (let i = 0; i < 5; i++) {
+          if (i < val) {
+            stars[i].style.opacity = '1';
+          } else {
+            stars[i].style.opacity = '0.35';
+          }
+        }
+      };
+
+      window.submitReviewAndReleasePayout = function() {
+        const comment = document.getElementById('workspace-review-comment').value.trim();
+        if (!comment) {
+          showToast('Please provide a review comment for the freelancer.', 'warning');
+          return;
+        }
+
+        const submitBtn = document.querySelector('#review-modal .btn-primary');
+        submitBtn.disabled = true;
+        submitBtn.textContent = '⏳ Processing...';
+
+        // 1. Submit rating & review
+        API.post(`/projects/${reviewTargetProjectId}/reviews`, {
+          reviewee_id: reviewTargetFreelancerId,
+          rating: selectedWorkspaceRating,
+          comment: comment
+        }).then(() => {
+          // 2. Approve & Release Escrowed Payout
+          return API.post('/payments/release', { project_id: reviewTargetProjectId });
+        }).then(() => {
+          showToast('🎉 Project completed, review saved, and payout released successfully!', 'success');
+          closeReviewModal();
           loadWalletDesk();
         }).catch(err => {
-          showToast('Escrow release failed: ' + err.message, 'error');
+          showToast('Action failed: ' + err.message, 'error');
+        }).finally(() => {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit & Release Payout';
         });
+      };
+
+      window.releaseProjectEscrow = function(projectId, freelancerId) {
+        openReviewModal(projectId, freelancerId);
       };
 
       // Revert/Refund Escrow trigger
@@ -245,15 +332,15 @@
           document.getElementById('client-stats-row').innerHTML = `
             <article class="glass stat-card" style="border-left:4px solid var(--accent)">
               <span class="label">💳 Available Balance</span>
-              <span class="value" style="color:var(--accent)" id="client-wallet-bal">$${w.balance.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+              <span class="value" style="color:var(--accent)" id="client-wallet-bal">₹${w.balance.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
             </article>
             <article class="glass stat-card" style="border-left:4px solid #f59e0b">
               <span class="label">🔒 Locked Escrow</span>
-              <span class="value" style="color:#f59e0b">$${w.pending_balance.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+              <span class="value" style="color:#f59e0b">₹${w.pending_balance.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
             </article>
             <article class="glass stat-card" style="border-left:4px solid #10b981">
               <span class="label">📈 Lifetime Spend</span>
-              <span class="value" style="color:#10b981">$${w.total_spent.toLocaleString('en-US', {minimumFractionDigits:2})}</span>
+              <span class="value" style="color:#10b981">₹${w.total_spent.toLocaleString('en-IN', {minimumFractionDigits:2})}</span>
             </article>
           `;
 
@@ -273,10 +360,10 @@
                 <div>
                   <h4 style="font-size:0.88rem;font-weight:700">${e.project_title}</h4>
                   <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.15rem">Hired Student: <strong>${e.freelancer_name}</strong></div>
-                  <div style="font-size:0.85rem;color:var(--accent);font-weight:700;margin-top:0.25rem">$${e.amount.toLocaleString()} Cr</div>
+                  <div style="font-size:0.85rem;color:var(--accent);font-weight:700;margin-top:0.25rem">₹${e.amount.toLocaleString('en-IN')}</div>
                 </div>
                 <div style="display:flex;gap:0.4rem">
-                  <button onclick="releaseProjectEscrow(${e.project_id})" class="btn btn-primary btn-sm">💸 Release Payout</button>
+                  <button onclick="releaseProjectEscrow(${e.project_id}, ${e.freelancer_id})" class="btn btn-primary btn-sm">💸 Release Payout</button>
                   <button onclick="refundProjectEscrow(${e.project_id})" class="btn btn-ghost btn-sm" style="color:var(--danger)">Refund</button>
                 </div>
               </div>
@@ -307,7 +394,7 @@
                   <td style="font-family:monospace;font-size:0.8rem">${t.reference_code}</td>
                   <td style="font-size:0.8rem;color:var(--text-secondary)">${new Date(t.created_at).toLocaleDateString()} ${new Date(t.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</td>
                   <td>${typeBadge}</td>
-                  <td style="font-weight:900;color:${amountColor}">${prefix}$${t.amount.toFixed(2)}</td>
+                  <td style="font-weight:900;color:${amountColor}">${prefix}₹${t.amount.toFixed(2)}</td>
                   <td style="font-size:0.8rem;text-transform:capitalize">${t.status}</td>
                 </tr>
               `;

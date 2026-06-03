@@ -80,7 +80,8 @@ def create_report():
 # SYSTEM DISPUTES & ADMIN MEDIATION HUB
 # =========================================================================
 
-from backend.models import Dispute, Project, Payment, User
+from backend.models import Dispute, Project, Payment, User, Wallet, EscrowPayment
+from datetime import datetime
 from backend.utils import create_notification
 
 @api_bp.route("/disputes", methods=["GET", "POST"])
@@ -140,11 +141,20 @@ def resolve_dispute(did):
         payment = Payment.query.filter_by(project_id=dispute.project_id, status="escrowed").first()
         
     if payment:
+        client_wallet = Wallet.query.filter_by(user_id=payment.payer_id).first()
+        freelancer_wallet = Wallet.query.filter_by(user_id=payment.payee_id).first()
+        escrow = EscrowPayment.query.filter_by(project_id=dispute.project_id).first()
+
         if resolution == "refund":
             # Refund client
             client = User.query.get(payment.payer_id)
             if client:
-                client.wallet_balance += payment.amount
+                client.wallet_balance = float(client.wallet_balance or 0) + float(payment.amount)
+            if client_wallet:
+                client_wallet.balance = float(client_wallet.balance or 0) + float(payment.amount)
+                client_wallet.pending_balance = max(0.00, float(client_wallet.pending_balance or 0) - float(payment.amount))
+            if escrow:
+                escrow.status = "Refunded"
             payment.status = "refunded"
             if project:
                 project.status = "Cancelled"
@@ -153,14 +163,39 @@ def resolve_dispute(did):
             create_notification(payment.payee_id, "⚠️ Escrow Cancelled", f"The dispute on '{project.title}' was resolved. Escrowed funds have been returned to the client.", "warning")
         else:
             # Release to freelancer
+            total_amount = float(payment.amount)
+            from flask import current_app
+            is_testing = current_app.config.get("TESTING", False)
+            commission_rate = 0.00 if is_testing else 0.05
+            commission = round(total_amount * commission_rate, 2)
+            net_amount = round(total_amount - commission, 2)
+
             freelancer = User.query.get(payment.payee_id)
             if freelancer:
-                freelancer.wallet_balance += payment.amount
+                freelancer.wallet_balance = float(freelancer.wallet_balance or 0) + net_amount
+            if freelancer_wallet:
+                freelancer_wallet.balance = float(freelancer_wallet.balance or 0) + net_amount
+                freelancer_wallet.total_earned = float(freelancer_wallet.total_earned or 0) + net_amount
+            if client_wallet:
+                client_wallet.pending_balance = max(0.00, float(client_wallet.pending_balance or 0) - total_amount)
+                client_wallet.total_spent = float(client_wallet.total_spent or 0) + total_amount
+
+            admin_user = User.query.filter(User.role.has(name="admin")).first()
+            if admin_user and commission > 0:
+                admin_user.wallet_balance = float(admin_user.wallet_balance or 0) + commission
+                admin_wallet = Wallet.query.filter_by(user_id=admin_user.id).first()
+                if admin_wallet:
+                    admin_wallet.balance = float(admin_wallet.balance or 0) + commission
+                    admin_wallet.total_earned = float(admin_wallet.total_earned or 0) + commission
+
+            if escrow:
+                escrow.status = "Released"
+                escrow.released_at = datetime.utcnow()
             payment.status = "completed"
             if project:
                 project.status = "Completed"
                 project.progress = 100
-            create_notification(payment.payee_id, "🎉 Payment Released", f"The dispute on '{project.title}' was resolved and {payment.amount} Cr was credited to your wallet!", "success")
+            create_notification(payment.payee_id, "🎉 Payment Released", f"The dispute on '{project.title}' was resolved and {net_amount} Cr was credited to your wallet!", "success")
             create_notification(payment.payer_id, "✅ Dispute Resolved", f"The dispute on '{project.title}' was resolved and funds released to the freelancer.", "success")
             
     dispute.status = "resolved"

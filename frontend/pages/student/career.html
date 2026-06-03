@@ -785,7 +785,7 @@
             ? '<p style="color:var(--text-secondary);font-size:.78rem">No matching projects right now.</p>'
             : data.recommendations.map(p =>
               `<div class="skill-row">
-                <div><span style="font-weight:600">${p.title}</span><br><span style="font-size:.72rem;color:var(--success)">${p.budget.toFixed(0)} Cr</span></div>
+                <div><span style="font-weight:600">${p.title}</span><br><span style="font-size:.72rem;color:var(--success)">${formatMoney(p.budget)}</span></div>
                 <a href="projects.html" class="btn btn-ghost btn-sm" style="font-size:.7rem;padding:.2rem .5rem">View</a>
               </div>`
             ).join('');

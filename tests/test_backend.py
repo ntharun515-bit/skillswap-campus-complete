@@ -128,6 +128,57 @@ class SkillSwapBackendTests(unittest.TestCase):
         self.assertEqual(res_post_cli.status_code, 201)
         self.assertEqual(res_post_cli.json["title"], "Build Obsidian API Integrator")
 
+    def test_applicant_capability_indicators(self):
+        """Verify applicant API responses include student capability fields for client hiring decisions."""
+        # Setup client
+        self.client.post("/api/auth/register", json={
+            "email": "cap_client@campus.edu", "password": "Password123!",
+            "full_name": "Cap Client", "role": "client"
+        })
+        self.client.post("/api/auth/register", json={
+            "email": "cap_student@campus.edu", "password": "Password123!",
+            "full_name": "Cap Student", "role": "student"
+        })
+        c_res = self.client.post("/api/auth/login", json={"email": "cap_client@campus.edu", "password": "Password123!"})
+        c_tok = c_res.json.get("access_token") or c_res.json.get("token")
+        s_res = self.client.post("/api/auth/login", json={"email": "cap_student@campus.edu", "password": "Password123!"})
+        s_tok = s_res.json.get("access_token") or s_res.json.get("token")
+
+        # Client posts project
+        p_res = self.client.post("/api/projects", json={
+            "title": "Capability Test Project", "description": "Testing capability fields",
+            "budget": 250.00, "skills_required": "Python"
+        }, headers={"Authorization": f"Bearer {c_tok}"})
+        proj_id = p_res.json["id"]
+
+        # Student applies
+        app_res = self.client.post(f"/api/projects/{proj_id}/apply", json={
+            "proposed_rate": 250.00,
+            "cover_letter": "I am highly skilled in Python development."
+        }, headers={"Authorization": f"Bearer {s_tok}"})
+        self.assertEqual(app_res.status_code, 201)
+
+        # Client retrieves applications
+        apps_res = self.client.get(f"/api/projects/{proj_id}/applications",
+                                   headers={"Authorization": f"Bearer {c_tok}"})
+        self.assertEqual(apps_res.status_code, 200)
+        apps = apps_res.json
+        self.assertEqual(len(apps), 1)
+
+        a = apps[0]
+        # Assert all capability indicator fields are present in the response
+        self.assertIn("applicant_headline", a)
+        self.assertIn("applicant_level", a)
+        self.assertIn("applicant_rating_avg", a)
+        self.assertIn("applicant_rating_count", a)
+        self.assertIn("applicant_slug", a)
+
+        # By default for a new student: level=Rookie, avg=0.0, count=0, slug=None
+        self.assertEqual(a["applicant_level"], "Rookie")
+        self.assertEqual(a["applicant_rating_avg"], 0.0)
+        self.assertEqual(a["applicant_rating_count"], 0)
+        self.assertIsNone(a["applicant_slug"])
+
     def test_complete_escrow_ledger_flow(self):
         """Test end-to-end payment locking, releases, and double-spend withdraw validations."""
         # 1. Create client & student
@@ -226,6 +277,142 @@ class SkillSwapBackendTests(unittest.TestCase):
         res_s_bal_w = self.client.get("/api/wallet/balance", headers={"Authorization": f"Bearer {s_tok}"})
         self.assertEqual(res_s_bal_w.json["wallet"]["balance"], 200.00)
         self.assertEqual(res_s_bal_w.json["wallet"]["pending_balance"], 100.00)
+
+    def test_client_review_system_integration(self):
+        """Test review creation, rating limits, security controls, profile updates, and idempotency."""
+        # 1. Create client & students
+        self.client.post("/api/auth/register", json={
+            "email": "review_client@campus.edu",
+            "password": "Password123!",
+            "full_name": "Review Client",
+            "role": "client"
+        })
+        self.client.post("/api/auth/register", json={
+            "email": "review_student@campus.edu",
+            "password": "Password123!",
+            "full_name": "Review Freelancer",
+            "role": "student"
+        })
+        self.client.post("/api/auth/register", json={
+            "email": "other_student@campus.edu",
+            "password": "Password123!",
+            "full_name": "Other Freelancer",
+            "role": "student"
+        })
+        self.client.post("/api/auth/register", json={
+            "email": "other_client@campus.edu",
+            "password": "Password123!",
+            "full_name": "Other Client",
+            "role": "client"
+        })
+
+        # Logins
+        c_res = self.client.post("/api/auth/login", json={"email": "review_client@campus.edu", "password": "Password123!"})
+        c_tok = c_res.json.get("access_token") or c_res.json.get("token")
+        
+        s_res = self.client.post("/api/auth/login", json={"email": "review_student@campus.edu", "password": "Password123!"})
+        s_tok = s_res.json.get("access_token") or s_res.json.get("token")
+        s_user_id = s_res.json["user"]["id"]
+
+        other_s_res = self.client.post("/api/auth/login", json={"email": "other_student@campus.edu", "password": "Password123!"})
+        other_s_user_id = other_s_res.json["user"]["id"]
+
+        other_c_res = self.client.post("/api/auth/login", json={"email": "other_client@campus.edu", "password": "Password123!"})
+        other_c_tok = other_c_res.json.get("access_token") or other_c_res.json.get("token")
+
+        # 2. Client Posts Project
+        p_res = self.client.post(
+            "/api/projects",
+            json={
+                "title": "Review Testing Campaign",
+                "description": "Verification of review workflow",
+                "budget": 200.00,
+                "skills_required": "Flask"
+            },
+            headers={"Authorization": f"Bearer {c_tok}"}
+        )
+        proj_id = p_res.json["id"]
+
+        # Student Applies
+        app_res = self.client.post(
+            f"/api/projects/{proj_id}/apply",
+            json={
+                "proposed_rate": 200.00,
+                "cover_letter": "I will deliver excellent outcomes."
+            },
+            headers={"Authorization": f"Bearer {s_tok}"}
+        )
+        app_id = app_res.json["id"]
+
+        # Client Accepts & Hires
+        self.client.put(
+            f"/api/projects/applications/{app_id}",
+            json={"status": "accepted"},
+            headers={"Authorization": f"Bearer {c_tok}"}
+        )
+
+        # 3. Test Invalid Rating Boundaries
+        res_err_rating = self.client.post(
+            f"/api/projects/{proj_id}/reviews",
+            json={"reviewee_id": s_user_id, "rating": 6, "comment": "Amazing!"},
+            headers={"Authorization": f"Bearer {c_tok}"}
+        )
+        self.assertEqual(res_err_rating.status_code, 400)
+
+        res_err_rating2 = self.client.post(
+            f"/api/projects/{proj_id}/reviews",
+            json={"reviewee_id": s_user_id, "rating": 0, "comment": "Poor"},
+            headers={"Authorization": f"Bearer {c_tok}"}
+        )
+        self.assertEqual(res_err_rating2.status_code, 400)
+
+        # 4. Test Reviewing Non-Hired Freelancer
+        res_err_unhired = self.client.post(
+            f"/api/projects/{proj_id}/reviews",
+            json={"reviewee_id": other_s_user_id, "rating": 5, "comment": "Good job"},
+            headers={"Authorization": f"Bearer {c_tok}"}
+        )
+        self.assertEqual(res_err_unhired.status_code, 400)
+
+        # 5. Test Unauthorized Client Review (from other_client)
+        res_err_auth = self.client.post(
+            f"/api/projects/{proj_id}/reviews",
+            json={"reviewee_id": s_user_id, "rating": 5, "comment": "Trying to bypass"},
+            headers={"Authorization": f"Bearer {other_c_tok}"}
+        )
+        self.assertEqual(res_err_auth.status_code, 403)
+
+        # 6. Post valid review
+        res_valid = self.client.post(
+            f"/api/projects/{proj_id}/reviews",
+            json={"reviewee_id": s_user_id, "rating": 5, "comment": "Stunning quality work!"},
+            headers={"Authorization": f"Bearer {c_tok}"}
+        )
+        self.assertEqual(res_valid.status_code, 201)
+        self.assertEqual(res_valid.json["rating"], 5)
+        self.assertEqual(res_valid.json["comment"], "Stunning quality work!")
+
+        # Verify rating updates on FreelancerProfile
+        from backend.models import FreelancerProfile
+        prof = FreelancerProfile.query.filter_by(user_id=s_user_id).first()
+        self.assertIsNotNone(prof)
+        self.assertEqual(prof.rating_count, 1)
+        self.assertEqual(prof.rating_avg, 5.0)
+
+        # 7. Test Idempotency (Updating the same review)
+        res_update = self.client.post(
+            f"/api/projects/{proj_id}/reviews",
+            json={"reviewee_id": s_user_id, "rating": 4, "comment": "Actually, it was decent, 4 stars."},
+            headers={"Authorization": f"Bearer {c_tok}"}
+        )
+        self.assertEqual(res_update.status_code, 200)
+        self.assertEqual(res_update.json["rating"], 4)
+        self.assertEqual(res_update.json["comment"], "Actually, it was decent, 4 stars.")
+
+        # Verify FreelancerProfile updates accordingly
+        db.session.refresh(prof)
+        self.assertEqual(prof.rating_count, 1)
+        self.assertEqual(prof.rating_avg, 4.0)
 
 
 if __name__ == "__main__":
