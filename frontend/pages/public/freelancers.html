@@ -119,18 +119,35 @@
                 ${campus ? `<div class="fl-campus">📍 ${campus}</div>` : ''}
               </div>
             </div>
-            <div class="fl-stats">
+            <div class="fl-stats" style="margin-top:0.5rem">
               <span>⭐ <strong>${(f.rating_avg||0).toFixed(1)}</strong> (${f.rating_count||0})</span>
               <span>🏆 <strong>${f.level || 'Rookie'}</strong></span>
               <span>📦 <strong>${f.completed_projects||0}</strong> done</span>
             </div>
-            ${skills.length ? `<div class="fl-skills">${skills.map(s => `<span class="fl-skill">${s.name||s}</span>`).join('')}</div>` : ''}
+            ${skills.length ? `<div class="fl-skills" style="margin-top:0.75rem">${skills.map(s => `<span class="fl-skill">${s.name||s}</span>`).join('')}</div>` : ''}
             <div class="fl-bottom">
               <span class="fl-rate">${f.hourly_rate ? formatMoney(f.hourly_rate) + '/hr' : 'Flexible'}</span>
-              <div class="fl-badges">${badges.join('')}</div>
+              <div style="display:flex;gap:0.5rem;align-items:center">
+                <a href="/profile/${(f.user.full_name||'').toLowerCase().replace(/ /g, '-')}" class="btn btn-outline btn-sm" style="padding:0.25rem 0.5rem;font-size:0.75rem">👀 Profile</a>
+                <button class="btn btn-ghost btn-sm" onclick="saveFreelancer(${f.user_id})" style="padding:0.25rem 0.5rem;font-size:0.75rem">❤️ Save</button>
+                <div class="fl-badges">${badges.join('')}</div>
+              </div>
             </div>
           </article>`;
       }).join('');
+    }
+
+    async function saveFreelancer(id) {
+      if (!isLoggedIn()) {
+        showToast('Please log in to save freelancers.', 'warning');
+        return;
+      }
+      try {
+        await API.post('/users/saved-freelancers', { freelancer_id: id });
+        showToast('Freelancer saved successfully!', 'success');
+      } catch(e) {
+        showToast('Failed to save: ' + e.message, 'error');
+      }
     }
 
     loadFreelancers();

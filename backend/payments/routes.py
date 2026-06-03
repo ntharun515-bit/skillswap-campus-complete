@@ -15,7 +15,7 @@ def get_or_create_wallet(user_id, role_name):
     """Helper to fetch or establish a virtual wallet with seed credits."""
     wallet = Wallet.query.filter_by(user_id=user_id).first()
     if not wallet:
-        # Give initial balance: $1000 for clients, $0 for students/freelancers
+        # Give initial balance: ₹1000 for clients, ₹0 for students/freelancers
         initial_balance = 1000.00 if role_name == "client" else 0.00
         wallet = Wallet(
             user_id=user_id,
@@ -99,7 +99,7 @@ def add_funds():
     amount = float(data.get("amount", 0))
 
     if amount <= 0 or amount > 5000:
-        return jsonify({"error": "Top-up amounts must be between $1 and $5000 virtual credits."}), 400
+        return jsonify({"error": "Top-up amounts must be between ₹1 and ₹5000 virtual credits."}), 400
 
     wallet = get_or_create_wallet(user.id, "client")
 
@@ -125,7 +125,7 @@ def add_funds():
         trigger_payment_alert(
             user_id,
             "💰 Credits Added Successfully!",
-            f"Successfully added ${amount:,.2f} virtual credits to your active wallet."
+            f"Successfully added ₹{amount:,.2f} virtual credits to your active wallet."
         )
 
         return jsonify({
@@ -165,7 +165,7 @@ def lock_escrow_payment():
     wallet = get_or_create_wallet(user_id, "client")
 
     if float(wallet.balance) < budget:
-        return jsonify({"error": f"Insufficient wallet credits. Required: ${budget:.2f}, Balance: ${float(wallet.balance):.2f}"}), 400
+        return jsonify({"error": f"Insufficient wallet credits. Required: ₹{budget:.2f}, Balance: ₹{float(wallet.balance):.2f}"}), 400
 
     freelancer_id = project.hired_freelancer_id
     if not freelancer_id:
@@ -203,7 +203,7 @@ def lock_escrow_payment():
             type="escrow_lock",
             status="completed",
             reference_code=ref,
-            description=f"Locked ${budget:.2f} virtual credits in escrow for: {project.title}."
+            description=f"Locked ₹{budget:.2f} virtual credits in escrow for: {project.title}."
         )
         db.session.add(tx)
 
@@ -213,7 +213,7 @@ def lock_escrow_payment():
             project_id=project_id,
             status="escrow_funded",
             action_by_id=user_id,
-            details=f"Secure escrow contract of ${budget:.2f} established and locked."
+            details=f"Secure escrow contract of ₹{budget:.2f} established and locked."
         )
         db.session.add(timeline)
         
@@ -223,12 +223,12 @@ def lock_escrow_payment():
         trigger_payment_alert(
             user_id,
             "🔒 Escrow Funds Locked",
-            f"Successfully established escrow. ${budget:,.2f} has been locked securely."
+            f"Successfully established escrow. ₹{budget:,.2f} has been locked securely."
         )
         trigger_payment_alert(
             freelancer_id,
             "🤝 Hired & Escrow Funded!",
-            f"Client funded escrow contract of ${budget:,.2f} for campaign '{project.title}'!"
+            f"Client funded escrow contract of ₹{budget:,.2f} for campaign '{project.title}'!"
         )
 
         return jsonify({
@@ -306,7 +306,7 @@ def release_escrow_payment():
             type="escrow_release",
             status="completed",
             reference_code=ref,
-            description=f"Released escrow payment of ${net_amount:.2f} (after 5% platform fee) for campaign '{project.title}' completion."
+            description=f"Released escrow payment of ₹{net_amount:.2f} (after 5% platform fee) for campaign '{project.title}' completion."
         )
         db.session.add(tx)
 
@@ -331,7 +331,7 @@ def release_escrow_payment():
             project_id=project_id,
             status="completed",
             action_by_id=user_id,
-            details=f"Milestone deliverables verified and escrow payout of ${net_amount:.2f} released."
+            details=f"Milestone deliverables verified and escrow payout of ₹{net_amount:.2f} released."
         )
         db.session.add(timeline)
 
@@ -341,18 +341,18 @@ def release_escrow_payment():
         trigger_payment_alert(
             user_id,
             "💸 Escrow Released",
-            f"Escrow balance of ${amount:,.2f} released to developer."
+            f"Escrow balance of ₹{amount:,.2f} released to developer."
         )
         trigger_payment_alert(
             escrow.freelancer_id,
             "🎉 Available Earnings Updated!",
-            f"Escrow payment of ${net_amount:,.2f} successfully released to your wallet (after 5% platform fee of ${commission:,.2f})!"
+            f"Escrow payment of ₹{net_amount:,.2f} successfully released to your wallet (after 5% platform fee of ₹{commission:,.2f})!"
         )
         if admin_user:
             trigger_payment_alert(
                 admin_user.id,
                 "📈 Fee Earned",
-                f"Platform fee of ${commission:,.2f} received!"
+                f"Platform fee of ₹{commission:,.2f} received!"
             )
 
         return jsonify({
@@ -409,7 +409,7 @@ def refund_escrow_payment():
             type="refund",
             status="completed",
             reference_code=ref,
-            description=f"Refunded locked escrow contract of ${amount:.2f} back to client."
+            description=f"Refunded locked escrow contract of ₹{amount:.2f} back to client."
         )
         db.session.add(tx)
 
@@ -417,12 +417,12 @@ def refund_escrow_payment():
             project_id=project_id,
             status="cancelled",
             action_by_id=user_id,
-            details=f"Escrow contract cancelled and ${amount:.2f} refunded back to client."
+            details=f"Escrow contract cancelled and ₹{amount:.2f} refunded back to client."
         )
         db.session.add(timeline)
         db.session.commit()
 
-        trigger_payment_alert(escrow.client_id, "↩️ Escrow Refunded", f"Successfully refunded ${amount:,.2f} virtual credits back to your wallet.")
+        trigger_payment_alert(escrow.client_id, "↩️ Escrow Refunded", f"Successfully refunded ₹{amount:,.2f} virtual credits back to your wallet.")
         trigger_payment_alert(escrow.freelancer_id, "⚠️ Project Cancelled", f"The project '{project.title}' escrow contract has been cancelled.")
 
         return jsonify({"message": "Escrow successfully refunded and cancelled."}), 200
@@ -470,11 +470,11 @@ def request_payout_withdrawal():
     method = data.get("method", "PayPal").strip()
 
     if amount < 10 or amount > 2000:
-        return jsonify({"error": "Withdrawals must be between $10 and $2000 virtual credits."}), 400
+        return jsonify({"error": "Withdrawals must be between ₹10 and ₹2000 virtual credits."}), 400
 
     wallet = get_or_create_wallet(user_id, "student")
     if float(wallet.balance) < amount:
-        return jsonify({"error": f"Insufficient wallet earnings balance. Available: ${float(wallet.balance):.2f}"}), 400
+        return jsonify({"error": f"Insufficient wallet earnings balance. Available: ₹{float(wallet.balance):.2f}"}), 400
 
     try:
         # Atomic lock: block withdrawal credits
@@ -494,7 +494,7 @@ def request_payout_withdrawal():
         trigger_payment_alert(
             user_id,
             "💸 Withdrawal Registered",
-            f"Withdrawal of ${amount:,.2f} via {method} is registered and pending Admin verification."
+            f"Withdrawal of ₹{amount:,.2f} via {method} is registered and pending Admin verification."
         )
 
         return jsonify({
@@ -572,7 +572,7 @@ def approve_withdrawal(req_id):
         trigger_payment_alert(
             req.user_id,
             "✅ Payout Disbursed!",
-            f"Your withdrawal payout of ${amount:,.2f} via {req.method} has been fully processed!"
+            f"Your withdrawal payout of ₹{amount:,.2f} via {req.method} has been fully processed!"
         )
 
         return jsonify({"message": "Withdrawal successfully approved and processed."}), 200
@@ -617,7 +617,7 @@ def reject_withdrawal(req_id):
         trigger_payment_alert(
             req.user_id,
             "❌ Withdrawal Declined",
-            f"Your payout request of ${amount:,.2f} was declined. Reason: {note}. Balance returned."
+            f"Your payout request of ₹{amount:,.2f} was declined. Reason: {note}. Balance returned."
         )
 
         return jsonify({"message": "Withdrawal request declined and balance reverted."}), 200

@@ -4,7 +4,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from flask import Flask, send_from_directory, jsonify
 from backend.config import config_map
-from backend.extensions import db, migrate, jwt, socketio, limiter, cors
+from backend.extensions import db, migrate, jwt, socketio, limiter, cors, compress, cache
 from backend.auth import auth_bp
 from backend.users import users_bp
 from backend.projects import projects_bp
@@ -35,6 +35,8 @@ def create_app(config_name=None):
     limiter.init_app(app)
     cors.init_app(app, resources={r"/api/*": {"origins": app.config["CORS_ORIGINS"]}}, supports_credentials=True)
     socketio.init_app(app)
+    compress.init_app(app)
+    cache.init_app(app)
 
     with app.app_context():
         db.create_all()
@@ -81,13 +83,13 @@ def create_app(config_name=None):
 
     @app.route("/uploads/<path:filename>")
     def uploaded_file(filename):
-        return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+        return send_from_directory(app.config["UPLOAD_FOLDER"], filename, max_age=31536000)
 
     @app.route("/frontend/<path:path>")
     def serve_frontend(path):
         full = os.path.join(app.static_folder, path)
         if os.path.isfile(full):
-            return send_from_directory(app.static_folder, path)
+            return send_from_directory(app.static_folder, path, max_age=31536000)
         return send_from_directory(app.static_folder, "pages/public/index.html")
 
     _setup_logging(app)

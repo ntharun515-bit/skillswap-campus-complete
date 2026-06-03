@@ -3,7 +3,8 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy import or_
-from backend.extensions import db, socketio
+from sqlalchemy.orm import joinedload, selectinload
+from backend.extensions import db, socketio, cache
 from backend.models import (
     Project, Application, Review, Payment, SavedJob,
     User, FreelancerProfile, Category, Notification, Wallet, Transaction
@@ -45,7 +46,12 @@ def list_projects():
         is_urgent_bool = is_urgent.lower() in ("true", "1", "yes")
         query = query.filter_by(is_urgent=is_urgent_bool)
         
-    projects = query.order_by(Project.is_featured.desc(), Project.created_at.desc()).limit(50).all()
+    projects = query.options(
+        joinedload(Project.client),
+        joinedload(Project.category),
+        joinedload(Project.team),
+        selectinload(Project.applications)
+    ).order_by(Project.is_featured.desc(), Project.created_at.desc()).limit(50).all()
     return jsonify([p.to_dict() for p in projects])
 
 
@@ -143,7 +149,12 @@ def my_projects():
         if team_ids:
             query_conditions.append(Project.team_id.in_(team_ids))
             
-        projects = Project.query.filter(or_(*query_conditions)).order_by(Project.created_at.desc()).all()
+        projects = Project.query.options(
+            joinedload(Project.client),
+            joinedload(Project.category),
+            joinedload(Project.team),
+            selectinload(Project.applications)
+        ).filter(or_(*query_conditions)).order_by(Project.created_at.desc()).all()
     return jsonify([p.to_dict() for p in projects])
 
 
@@ -463,6 +474,7 @@ def payments(project_id):
 
 
 @projects_bp.route("/categories", methods=["GET"])
+@cache.cached(timeout=3600)
 def categories():
     cats = Category.query.all()
     return jsonify([{"id": c.id, "name": c.name, "slug": c.slug, "icon": c.icon} for c in cats])

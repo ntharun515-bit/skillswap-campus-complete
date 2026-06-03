@@ -2,8 +2,10 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy import or_
+from flask import current_app
 from backend.extensions import db
 from backend.models import Conversation, Message, User
+from backend.utils import save_upload
 
 chat_bp = Blueprint("chat", __name__, url_prefix="/api/chat")
 
@@ -66,3 +68,23 @@ def get_messages(conv_id):
     Message.query.filter_by(conversation_id=conv_id).filter(Message.sender_id != user_id).update({"is_read": True})
     db.session.commit()
     return jsonify([m.to_dict() for m in messages])
+
+
+@chat_bp.route("/upload", methods=["POST"])
+@jwt_required()
+def upload_chat_file():
+    user_id = int(get_jwt_identity())
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+        
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No selected file"}), 400
+        
+    try:
+        # Save upload using the helper, allowing images and pdfs/documents
+        allowed = current_app.config.get("ALLOWED_IMAGE_EXTENSIONS", {"png", "jpg", "jpeg", "gif"}) | {"pdf", "zip", "doc", "docx"}
+        path = save_upload(file, "chat_attachments", allowed)
+        return jsonify({"file_path": path})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400

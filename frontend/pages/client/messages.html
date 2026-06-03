@@ -130,7 +130,9 @@
             </div>
 
             <!-- Message Input Area -->
-            <div style="display:flex;gap:0.75rem;border-top:1px solid var(--border);padding-top:1rem">
+            <div style="display:flex;gap:0.75rem;border-top:1px solid var(--border);padding-top:1rem;align-items:center;">
+              <input type="file" id="file-upload-input" style="display:none;" />
+              <button class="btn btn-ghost" id="attach-btn" disabled style="padding:0.4rem 0.8rem;font-size:1.2rem;cursor:pointer;" title="Attach File">📎</button>
               <input type="text" id="inp" placeholder="Type a secure message..." style="flex:1" disabled>
               <button class="btn btn-primary" id="send" disabled>Send Message</button>
             </div>
@@ -159,6 +161,8 @@
       const msgs = document.getElementById('msgs');
       const inp = document.getElementById('inp');
       const send = document.getElementById('send');
+      const attachBtn = document.getElementById('attach-btn');
+      const fileUploadInput = document.getElementById('file-upload-input');
       
       const partnerName = document.getElementById('chat-partner-name');
       const partnerStatus = document.getElementById('chat-partner-status');
@@ -258,6 +262,7 @@
         
         inp.disabled = false;
         send.disabled = false;
+        attachBtn.disabled = false;
         inp.focus();
 
         // Highlight active sidebar card
@@ -287,7 +292,7 @@
             const isSent = m.sender_id === uid;
             return `
               <div class="msg-bubble ${isSent ? 'sent' : 'received'}">
-                ${m.content}
+                ${renderMessageContent(m.content)}
               </div>
             `;
           }).join('');
@@ -299,6 +304,64 @@
         }
       }
 
+      function renderMessageContent(content) {
+        const match = content.match(/\[Attachment: (.*?)\]\((.*?)\)/);
+        if (match) {
+          const filename = escapeHtml(match[1]);
+          const url = escapeHtml(match[2]);
+          const isImage = url.match(/\\.(jpeg|jpg|gif|png)$/i) != null;
+          if (isImage) {
+            return `<a href="/${url}" target="_blank"><img src="/${url}" alt="${filename}" style="max-width:200px; border-radius:4px; margin-top:5px; border:1px solid rgba(255,255,255,0.1)"></a>`;
+          }
+          return `<a href="/${url}" target="_blank" style="color:var(--accent); text-decoration:underline;">📎 ${filename}</a>`;
+        }
+        return escapeHtml(content);
+      }
+      
+      // Handle file attachment
+      attachBtn.onclick = () => fileUploadInput.click();
+      
+      fileUploadInput.onchange = async () => {
+        const file = fileUploadInput.files[0];
+        if (!file || !currentConvId) return;
+        
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          const token = localStorage.getItem("skillswap_access_token");
+          const headers = { "Authorization": `Bearer ${token}` };
+          
+          showToast('Uploading file...', 'info');
+          const res = await fetch('/api/chat/upload', {
+            method: 'POST',
+            headers,
+            body: formData
+          });
+          const data = await res.json();
+          
+          if (!res.ok) throw new Error(data.error || 'Upload failed');
+          
+          const fileUrl = data.file_path;
+          const msgContent = `[Attachment: ${file.name}](${fileUrl})`;
+          
+          sendSocketMessage(currentConvId, msgContent);
+          
+          const localBubble = document.createElement('div');
+          localBubble.className = 'msg-bubble sent';
+          localBubble.innerHTML = renderMessageContent(msgContent);
+          msgs.appendChild(localBubble);
+          
+          msgs.scrollTop = msgs.scrollHeight;
+          fileUploadInput.value = '';
+          
+          loadConversations();
+          
+        } catch (err) {
+          showToast('Failed to upload file: ' + err.message, 'error');
+        }
+      };
+
       // Trigger socket submit
       function sendMessageText() {
         const val = inp.value.trim();
@@ -308,7 +371,7 @@
           // Optimistically append local chat bubble
           const localBubble = document.createElement('div');
           localBubble.className = 'msg-bubble sent';
-          localBubble.textContent = val;
+          localBubble.innerHTML = renderMessageContent(val);
           msgs.appendChild(localBubble);
           
           msgs.scrollTop = msgs.scrollHeight;
@@ -326,7 +389,7 @@
           if (m.sender_id !== getUser().id) {
             const bubble = document.createElement('div');
             bubble.className = 'msg-bubble received';
-            bubble.textContent = m.content;
+            bubble.innerHTML = renderMessageContent(m.content);
             msgs.appendChild(bubble);
             msgs.scrollTop = msgs.scrollHeight;
           }

@@ -59,6 +59,7 @@
                 <div style="display:flex;gap:.4rem;margin-top:.75rem">
                   <button class="btn btn-primary btn-sm accept-btn" data-id="${a.id}" style="font-size:.75rem">Hire</button>
                   <button class="btn btn-ghost btn-sm reject-btn" data-id="${a.id}" style="font-size:.75rem">Decline</button>
+                  <button class="btn btn-ghost btn-sm save-btn" data-fid="${a.applicant_id}" style="font-size:.75rem">❤️ Save Talent</button>
                 </div>`;
             }
 
@@ -92,6 +93,15 @@
                 showToast('Proposal declined', 'info');
                 load();
               } catch (err) { showToast('Error: ' + err.message, 'error'); }
+            };
+          });
+
+          al.querySelectorAll('.save-btn').forEach(btn => {
+            btn.onclick = async () => {
+              try {
+                await API.post('/users/saved-freelancers', { freelancer_id: btn.dataset.fid });
+                showToast('Freelancer saved successfully!', 'success');
+              } catch (err) { showToast('Error saving: ' + err.message, 'error'); }
             };
           });
 

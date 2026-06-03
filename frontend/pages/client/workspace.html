@@ -180,7 +180,7 @@
               <!-- Handoff review action console -->
               <div style="display:none;gap:0.5rem" id="review-action-console">
                 <button class="btn btn-ghost btn-sm" onclick="requestProjectRevision()">⚠️ Request Revision</button>
-                <button class="btn btn-primary btn-sm" onclick="releaseEscrowPayment()">✅ Approve & Release Payout</button>
+                <button class="btn btn-primary btn-sm" onclick="openReviewModal()">✅ Approve & Release Payout</button>
               </div>
             </div>
           </article>
@@ -277,8 +277,10 @@
               </div>
               <div class="ws-typing" id="ws-typing-indicator"></div>
               <div class="ws-chat-input-row">
+                <input type="file" id="ws-chat-file" style="display:none" onchange="wsUploadChatFile(event, 'ws-chat-input')">
+                <button class="btn btn-ghost" style="padding:0;background:transparent;color:var(--text-secondary);font-size:1.2rem;box-shadow:none" onclick="document.getElementById('ws-chat-file').click()" title="Attach file">📎</button>
                 <input type="text" id="ws-chat-input" placeholder="Message the freelancer…" onkeydown="wsChatKeydown(event)">
-                <button onclick="wsSendMsg()">Send</button>
+                <button class="btn btn-primary btn-sm" onclick="wsSendMsg()">Send</button>
               </div>
             </div>
 
@@ -287,7 +289,7 @@
               <h3>📋 Submission Review</h3>
               <div id="ws-review-status"><p>No deliverables submitted yet.</p></div>
               <div id="ws-review-actions" style="display:none;display:flex;flex-direction:column;gap:0.75rem">
-                <button class="btn btn-primary" onclick="releaseEscrowPayment()">✅ Approve &amp; Release Payment</button>
+                <button class="btn btn-primary" onclick="openReviewModal()">✅ Approve &amp; Release Payment</button>
                 <button class="btn btn-ghost" onclick="requestProjectRevision()">⚠️ Request Revision</button>
                 <button class="btn btn-ghost" style="color:var(--danger);border-color:var(--danger)" onclick="triggerMilestoneDispute()">⚖️ Open Dispute</button>
               </div>
@@ -318,6 +320,31 @@
             <div style="display:flex;justify-content:end;gap:0.75rem">
               <button class="btn btn-ghost" onclick="closeTaskModal()">Cancel</button>
               <button class="btn btn-primary" onclick="createTaskCard()">Save Card</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mandatory Review Modal layout overlay -->
+        <div class="overlay-modal" id="review-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:999;align-items:center;justify-content:center">
+          <div class="glass card" style="max-width:450px;width:90%">
+            <h2>Project Approval & Review</h2>
+            <p style="font-size:0.85rem;color:var(--text-secondary);margin-top:0.25rem">Before releasing payment, please rate and review the freelancer's work.</p>
+            <div style="margin-top:1.25rem">
+              <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.25rem">Star Rating</label>
+              <div style="display:flex;gap:0.25rem;margin-bottom:0.75rem" id="modal-review-stars">
+                <span style="cursor:pointer;font-size:1.8rem;color:var(--text-secondary)" onclick="setModalReviewScore(1)">☆</span>
+                <span style="cursor:pointer;font-size:1.8rem;color:var(--text-secondary)" onclick="setModalReviewScore(2)">☆</span>
+                <span style="cursor:pointer;font-size:1.8rem;color:var(--text-secondary)" onclick="setModalReviewScore(3)">☆</span>
+                <span style="cursor:pointer;font-size:1.8rem;color:var(--text-secondary)" onclick="setModalReviewScore(4)">☆</span>
+                <span style="cursor:pointer;font-size:1.8rem;color:var(--text-secondary)" onclick="setModalReviewScore(5)">☆</span>
+              </div>
+              
+              <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:0.25rem">Feedback</label>
+              <textarea id="modal-review-comment" class="form-control" style="width:100%;height:80px;margin-bottom:0.75rem" placeholder="Share your experience working with this freelancer..."></textarea>
+            </div>
+            <div style="display:flex;justify-content:end;gap:0.75rem">
+              <button class="btn btn-ghost" onclick="closeReviewModal()">Cancel</button>
+              <button class="btn btn-primary" onclick="submitMandatoryReviewAndRelease()">Submit & Release Payment</button>
             </div>
           </div>
         </div>
@@ -544,16 +571,18 @@
     // ═══════════════════════════════════════
     let wsConvId = null;
     let wsMeId = null;
+    let wsOtherId = null;
     let wsTypingTimeout = null;
+    let currentReviewScore = 0;
 
     function wsInitChat(project) {
       const me = JSON.parse(localStorage.getItem(CONFIG.USER_KEY) || '{}');
       wsMeId = me.id;
-      const otherId = project.hired_freelancer_id;
-      if (!otherId) return;
+      wsOtherId = project.hired_freelancer_id;
+      if (!wsOtherId) return;
       document.getElementById('ws-other-name').textContent = '— Freelancer';
 
-      API.post('/chat/conversations', { user_id: otherId, project_id: project.id })
+      API.post('/chat/conversations', { user_id: wsOtherId, project_id: project.id })
         .then(res => {
           wsConvId = res.conversation_id;
           wsLoadMessages();
@@ -599,7 +628,12 @@
       const div = document.createElement('div');
       div.className = 'ws-msg ' + (msg.sender_id === wsMeId ? 'sent' : 'recv');
       const time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
-      div.innerHTML = `${escapeHtml(msg.content)}<div class="msg-meta">${msg.sender_name||''} · ${time}</div>`;
+      
+      let htmlContent = escapeHtml(msg.content);
+      // Auto-link URLs
+      htmlContent = htmlContent.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" style="color:inherit;text-decoration:underline">$1</a>');
+
+      div.innerHTML = `${htmlContent}<div class="msg-meta">${msg.sender_name||''} · ${time}</div>`;
       box.appendChild(div);
       if (scroll) box.scrollTop = box.scrollHeight;
     }
@@ -621,6 +655,31 @@
       emitStopTyping(wsConvId);
     }
 
+    async function wsUploadChatFile(e, inputId) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch(CONFIG.API_URL + '/chat/upload', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + localStorage.getItem(CONFIG.TOKEN_KEY) },
+          body: formData
+        });
+        const data = await res.json();
+        if (data.file_path) {
+          const inputEl = document.getElementById(inputId);
+          inputEl.value = (inputEl.value + ' ' + location.origin + data.file_path).trim();
+          showToast('Attachment uploaded! Ready to send.', 'success');
+        } else {
+          showToast(data.error || 'Upload failed', 'error');
+        }
+      } catch (err) {
+        showToast('Upload failed: ' + err.message, 'error');
+      }
+      e.target.value = '';
+    }
+
     function wsUpdateReviewPanel(project) {
       const statusEl = document.getElementById('ws-review-status');
       const actionsEl = document.getElementById('ws-review-actions');
@@ -635,7 +694,16 @@
             </div>`;
           actionsEl.style.display = 'flex';
         } else if (project.status === 'completed') {
-          statusEl.innerHTML = '<div style="color:var(--success);font-weight:700">✅ Completed — Payment Released</div>';
+          statusEl.innerHTML = `
+            <div style="background:rgba(16,185,129,0.1);padding:1.25rem;border-radius:var(--radius-lg);border:1px solid rgba(16,185,129,0.3)">
+              <div style="color:var(--success);font-weight:800;font-size:1.05rem;margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem">
+                <span>✅</span> Project Completed & Paid
+              </div>
+              <div id="review-form-container" style="background:var(--bg-primary);padding:1rem;border-radius:var(--radius-md);border:1px solid var(--border)">
+                <p style="color:var(--text-secondary);font-size:0.9rem">Feedback has been provided and payment released.</p>
+              </div>
+            </div>
+          `;
           actionsEl.style.display = 'none';
         } else {
           statusEl.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem">No deliverables submitted yet. The freelancer is working on the project.</p>';
@@ -648,25 +716,65 @@
       return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
-    // Approving and Releasing Escrowed Payout
-    function releaseEscrowPayment() {
-      const pid = document.getElementById('workspace-project-select').value;
+    function setModalReviewScore(score) {
+      currentReviewScore = score;
+      const stars = document.getElementById('modal-review-stars').children;
+      for (let i = 0; i < 5; i++) {
+        stars[i].textContent = i < score ? '⭐' : '☆';
+        stars[i].style.color = i < score ? 'var(--warning)' : 'var(--text-secondary)';
+      }
+    }
+
+    function openReviewModal() {
+      document.getElementById('review-modal').style.display = 'flex';
+      setModalReviewScore(0);
+      document.getElementById('modal-review-comment').value = '';
+    }
+
+    function closeReviewModal() {
+      document.getElementById('review-modal').style.display = 'none';
+    }
+
+    function submitMandatoryReviewAndRelease() {
+      if (!currentReviewScore) {
+        showToast('Please select a star rating first.', 'warning');
+        return;
+      }
+      const comment = document.getElementById('modal-review-comment').value.trim();
+      if (comment.length < 10) {
+        showToast('Please provide at least 10 characters of feedback.', 'warning');
+        return;
+      }
       
-      API.post(`/projects/${pid}/payments`, {
-        milestone: "Final Handoff Review Approved & Credits Released"
+      const pid = document.getElementById('workspace-project-select').value;
+      if (!wsOtherId) return showToast('Error identifying freelancer.', 'error');
+
+      // 1. Submit the review
+      API.post(`/projects/${pid}/reviews`, {
+        reviewee_id: wsOtherId,
+        rating: currentReviewScore,
+        comment: comment
       }).then(() => {
-        // Log timeline release completion
-        return API.post(`/projects/${pid}/timeline`, {
-          status: "completed",
-          details: "Client approved final inspect and released locked Escrow credits."
+        // 2. Release payment upon successful review
+        return API.post(`/projects/${pid}/payments`, {
+          milestone: "Final Handoff Review Approved & Credits Released"
         });
       }).then(() => {
-        showToast('🎉 Milestones completely settled! Credits transferred successfully!', 'success');
+        // 3. Log timeline release completion
+        return API.post(`/projects/${pid}/timeline`, {
+          status: "completed",
+          details: "Client provided feedback and released locked Escrow credits."
+        });
+      }).then(() => {
+        closeReviewModal();
+        showToast('🎉 Review submitted & Escrow released successfully!', 'success');
         refreshWorkspaceData(pid);
       }).catch(err => {
-        showToast('Payout release failed: ' + err.message, 'error');
+        showToast('Transaction failed: ' + err.message, 'error');
       });
     }
+
+    // Approving and Releasing Escrowed Payout (Now chained in submitMandatoryReviewAndRelease)
 
     // Revision Requests — uses the dedicated /request-revision endpoint
     function requestProjectRevision() {

@@ -209,7 +209,7 @@ function formatDate(iso) {
 }
 
 function formatMoney(n) {
-  return "$" + Number(n || 0).toFixed(2);
+  return "₹" + Number(n || 0).toFixed(2);
 }
 
 // Interactive Premium Floating AI Chatbot Widget
